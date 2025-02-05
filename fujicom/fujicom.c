@@ -2,9 +2,14 @@
  * #FUJINET Low Level Routines
  */
 
+#undef DEBUG
+
 #include "fujicom.h"
 #include "com.h"
+
+#ifdef DEBUG
 #include "../sys/print.h" // debug
+#endif
 
 #include <env.h>
 #include <stdlib.h>
@@ -29,7 +34,10 @@ void fujicom_init(void)
     comp = atoi(getenv("FUJI_PORT"));
   if (getenv("FUJI_BPS"))
     bps = atol(getenv("FUJI_BPS"));
+
+#ifdef DEBUG
   consolef("Port: %i  BPS: %li\n", comp, (int32_t) bps);
+#endif
 
   switch (comp) {
   default:
@@ -94,12 +102,14 @@ int fujicom_command(cmdFrame_t far *cmd)
 
 
   //port_disable_interrupts(port);
-  // Flush any bytes left in the buffer
-  port_wait_for_rx_empty(port);
-
   _fujicom_send_command(cmd);
   reply = port_getc_nobuf(port, TIMEOUT);
   //port_enable_interrupts(port);
+
+#ifdef DEBUG
+  consolef("FN command reply: 0x%04x\n", reply);
+#endif
+
   return reply;
 }
 
@@ -113,8 +123,10 @@ int fujicom_command_read(cmdFrame_t far *cmd, uint8_t far *buf, uint16_t len)
   //port_disable_interrupts(port);
 
   for (retries = 0; retries < MAX_RETRIES; retries++) {
+#ifdef DEBUG
     if (retries)
-      consolef("FN retry: %i\n", retries);
+      consolef("FN read retry: %i\n", retries);
+#endif
 
     // Flush any bytes left in the buffer
     port_wait_for_rx_empty(port);
@@ -124,42 +136,56 @@ int fujicom_command_read(cmdFrame_t far *cmd, uint8_t far *buf, uint16_t len)
       break;
 
     if (reply != 'A') {
-      consolef("FN send command bad: 0x%02x\n", reply);
+#ifdef DEBUG
+      consolef("FN send command bad: 0x%04x\n", reply);
+#endif
       continue;
     }
 
-    /* Get COMPLETE/ERROR */
-    reply = port_getc_nobuf(port, 15 * 1000);
-    if (reply != 'C') {
-      consolef("FN complete fail: 0x%02x\n", reply);
-      continue;
-    }
-
-    /* Complete, get payload */
-    rlen = port_getbuf(port, buf, len, TIMEOUT);
-    if (rlen != len) {
-      consolef("FN Read failed: Exp:%i Got:%i  Cmd: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n",
-	       len, rlen,
-	       cmd->device, cmd->comnd, cmd->aux1, cmd->aux2, cmd->cksum);
-      reply = 'E';
-      continue;
-    }
-
-    /* Get Checksum byte, verify it. */
-    ck1 = port_getc_nobuf(port, TIMEOUT);
-    ck2 = fujicom_cksum(buf,len);
-
-    if (ck1 != ck2) {
-      consolef("FN checksum error\n");
-      reply = 'E';
-      continue;
-    }
-
-    /* No errors, we're done! */
     break;
   }
 
+  if (retries == MAX_RETRIES)
+    goto done;
+
+  /* Get COMPLETE/ERROR */
+  reply = port_getc_nobuf(port, TIMEOUT);
+  if (reply != 'C') {
+#ifdef DEBUG
+    consolef("FN complete fail: 0x%04x\n", reply);
+#endif
+    goto done;
+  }
+
+  /* Complete, get payload */
+  rlen = port_getbuf(port, buf, len, TIMEOUT);
+  if (rlen != len) {
+#ifdef DEBUG
+    consolef("FN Read failed: Exp:%i Got:%i  Cmd: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n",
+	     len, rlen,
+	     cmd->device, cmd->comnd, cmd->aux1, cmd->aux2, cmd->cksum);
+#endif
+    reply = 'E';
+    goto done;
+  }
+
+  /* Get Checksum byte, verify it. */
+  ck1 = port_getc_nobuf(port, TIMEOUT);
+  ck2 = fujicom_cksum(buf,len);
+
+  if (ck1 != ck2) {
+#ifdef DEBUG
+    consolef("FN read checksum error: 0x%02x 0x%02x\n", ck1, ck2);
+#endif
+    reply = 'E';
+  }
+
+ done:
   //port_enable_interrupts(port);
+#ifdef DEBUG
+  consolef("FN command read reply: 0x%04x\n", reply);
+#endif
+
   return reply;
 }
 
@@ -167,11 +193,16 @@ int fujicom_command_write(cmdFrame_t far *cmd, uint8_t far *buf, uint16_t len)
 {
   int reply;
   uint8_t ck;
-  int retries = MAX_RETRIES;
+  int retries;
 
   //port_disable_interrupts(port);
 
-  while (retries--) {
+  for (retries = 0; retries < MAX_RETRIES; retries++) {
+#ifdef DEBUG
+    if (retries)
+      consolef("FN write retry: %i\n", retries);
+#endif
+
     // Flush any bytes left in the buffer
     port_wait_for_rx_empty(port);
 
@@ -179,30 +210,49 @@ int fujicom_command_write(cmdFrame_t far *cmd, uint8_t far *buf, uint16_t len)
     if (reply == 'N')
       break;
 
-    if (reply != 'A')
+    if (reply != 'A') {
+#ifdef DEBUG
+      consolef("FN write command bad: 0x%04x\n", reply);
+#endif
       continue;
-
-    /* Write the payload */
-    port_putbuf(port, buf, len);
-
-    /* Write the checksum */
-    ck = fujicom_cksum(buf, len);
-    port_putc_nobuf(port, ck);
-
-    /* Wait for ACK/NACK */
-    reply = port_getc_nobuf(port, TIMEOUT);
-    if (reply != 'A')
-      continue;
-
-    /* Wait for COMPLETE/ERROR */
-    reply = port_getc_nobuf(port, TIMEOUT);
-    if (reply != 'C')
-      continue;
+    }
 
     break;
   }
 
-  //port_enable_interrupts(port);
+  if (retries == MAX_RETRIES)
+    goto done;
+
+  /* Write the payload */
+  port_putbuf(port, buf, len);
+
+  /* Write the checksum */
+  ck = fujicom_cksum(buf, len);
+  port_putc_nobuf(port, ck);
+
+  /* Wait for ACK/NACK */
+  reply = port_getc_nobuf(port, TIMEOUT);
+  if (reply != 'A') {
+#ifdef DEBUG
+    consolef("FN write ack fail: 0x%04x\n", reply);
+#endif
+    goto done;
+  }
+
+  /* Wait for COMPLETE/ERROR */
+  reply = port_getc_nobuf(port, TIMEOUT);
+  if (reply != 'C') {
+#ifdef DEBUG
+    consolef("FN write complete fail: 0x%04x\n", reply);
+#endif
+  }
+
+ done:
+  //port_enable_interrupts(port)
+#ifdef DEBUG
+  consolef("FN command write reply: 0x%04x\n", reply);
+#endif
+
   return reply;
 }
 
