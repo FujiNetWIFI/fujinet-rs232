@@ -96,10 +96,11 @@ void printDec32(uint32_t val, uint16_t width, char leading)
   return;
 }
 
-void dumpHex(uint8_t far *buffer, uint16_t count)
+void dumpHex(void far *ptr, uint16_t count)
 {
   int outer, inner;
   uint8_t c, is_err;
+  uint8_t far *buffer = (uint8_t far *) ptr;
 
 
   for (outer = 0; outer < count; outer += 16) {

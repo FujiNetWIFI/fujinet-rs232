@@ -59,10 +59,11 @@ void fujicom_init(void)
   return;
 }
 
-uint8_t fujicom_cksum(uint8_t far *buf, uint16_t len)
+uint8_t fujicom_cksum(void far *ptr, uint16_t len)
 {
   uint16_t chk = 0;
   int i = 0;
+  uint8_t far *buf = (uint8_t far *) ptr;
 
 
   for (i = 0; i < len; i++)
@@ -115,7 +116,7 @@ int fujicom_command(cmdFrame_t far *cmd)
   return reply;
 }
 
-int fujicom_command_read(cmdFrame_t far *cmd, uint8_t far *buf, uint16_t len)
+int fujicom_command_read(cmdFrame_t far *cmd, void far *ptr, uint16_t len)
 {
   int reply;
   uint16_t rlen;
@@ -160,7 +161,7 @@ int fujicom_command_read(cmdFrame_t far *cmd, uint8_t far *buf, uint16_t len)
   }
 
   /* Complete, get payload */
-  rlen = port_getbuf(port, buf, len, TIMEOUT);
+  rlen = port_getbuf(port, ptr, len, TIMEOUT);
   if (rlen != len) {
 #ifdef DEBUG
     consolef("FN Read failed: Exp:%i Got:%i  Cmd: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n",
@@ -173,7 +174,7 @@ int fujicom_command_read(cmdFrame_t far *cmd, uint8_t far *buf, uint16_t len)
 
   /* Get Checksum byte, verify it. */
   ck1 = port_getc_nobuf(port, TIMEOUT_SLOW);
-  ck2 = fujicom_cksum(buf,len);
+  ck2 = fujicom_cksum(ptr, len);
 
   if (ck1 != ck2) {
 #ifdef DEBUG
@@ -192,7 +193,7 @@ int fujicom_command_read(cmdFrame_t far *cmd, uint8_t far *buf, uint16_t len)
   return reply;
 }
 
-int fujicom_command_write(cmdFrame_t far *cmd, uint8_t far *buf, uint16_t len)
+int fujicom_command_write(cmdFrame_t far *cmd, void far *ptr, uint16_t len)
 {
   int reply;
   uint8_t ck;
@@ -227,10 +228,10 @@ int fujicom_command_write(cmdFrame_t far *cmd, uint8_t far *buf, uint16_t len)
     goto done;
 
   /* Write the payload */
-  port_putbuf(port, buf, len);
+  port_putbuf(port, ptr, len);
 
   /* Write the checksum */
-  ck = fujicom_cksum(buf, len);
+  ck = fujicom_cksum(ptr, len);
   port_putc_nobuf(port, ck);
 
   /* Wait for ACK/NACK */

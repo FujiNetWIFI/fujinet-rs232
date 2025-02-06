@@ -23,7 +23,7 @@ extern void printDTerm(const char *);
 extern void printHex(uint16_t val, uint16_t width, char leading);
 extern void printHex32(uint32_t val, uint16_t width, char leading);
 extern void printDec(uint16_t val, uint16_t width, char leading);
-extern void dumpHex(uint8_t far *buffer, uint16_t count);
+extern void dumpHex(void far *ptr, uint16_t count);
 
 extern void consolef(const char *format, ...);
 
