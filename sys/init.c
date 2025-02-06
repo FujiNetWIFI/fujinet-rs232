@@ -14,6 +14,27 @@
 #define VERSION "0.8"
 #endif
 
+#include <stdio.h>
+
+#if defined(__WATCOMC__)
+
+#define CC_VERSION_MINOR	(__WATCOMC__ % 100)
+#if __WATCOMC__ > 1100
+#define CC_VERSION_MAJOR	(__WATCOMC__ / 100 - 11)
+#define CC_VERSION_NAME		"Open Watcom"
+#else /* __WATCOMC__ > 1100 */
+#define CC_VERSION_MAJOR	(__WATCOMC__ / 100)
+#define CC_VERSION_NAME		"Watcom"
+#endif /* __WATCOMC__ > 1100 */
+
+#elif defined(__TURBOC__)
+
+#define CC_VERSION_MAJOR	(__TURBOC__ / 0x100)
+#define CC_VERSION_MINOR	(__TURBOC__ % 0x100)
+#define CC_VERSION_NAME		"Turbo C"
+
+#endif /* __WATCOMC__ */
+
 // FIXME - use SIMPLE with year + century, not APETIME
 struct _tm {
   char tm_mday;
@@ -44,7 +65,11 @@ uint16_t Init_cmd(SYSREQ far *req)
 
   regs.h.ah = 0x30;
   intdos(&regs, &regs);
-  consolef("\nFujiNet driver " VERSION " loaded on MS-DOS %i.%i\n", regs.h.al, regs.h.ah);
+  consolef("\nFujiNet driver " VERSION
+	   " " CC_VERSION_NAME " %i.%i"
+	   " on MS-DOS %i.%i\n",
+	   CC_VERSION_MAJOR, CC_VERSION_MINOR,
+	   regs.h.al, regs.h.ah);
   unused = parse_config(req->req_type.init_req.BPB_ptr);
   environ = (char **) &config_env;
 
