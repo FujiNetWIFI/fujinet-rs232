@@ -28,7 +28,7 @@ uint16_t Media_check_cmd(SYSREQ far *req)
 
 uint16_t Build_bpb_cmd(SYSREQ far *req)
 {
-  char reply;
+  int reply;
   uint8_t far *buf;
 
 
@@ -75,7 +75,7 @@ uint16_t Ioctl_input_cmd(SYSREQ far *req)
 
 uint16_t Input_cmd(SYSREQ far *req)
 {
-  char reply;
+  int reply;
   uint16_t idx, sector = req->req_type.i_o_req.start_sector;
   uint8_t far *buf = req->req_type.i_o_req.buffer_ptr;
 

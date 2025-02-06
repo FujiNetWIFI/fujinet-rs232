@@ -310,20 +310,12 @@ int port_getc(PORT far *port)
     return (port->in.buffer[port->in.read_index++]);
 }
 
-#define timeout_start() (to_start = get_time_ms());
-#define timeout_now()   (to_now = get_time_ms());
-
+static uint16_t to_start, to_now;
 /* Read BIOS tick counter and approximate it as milliseconds */
-static inline uint32_t get_time_ms()
-{
-  return *(volatile uint32_t far *) MK_FP(0x40, 0x6C) * 55;
-}
-
-static uint32_t to_start, to_now;
-static inline uint16_t timeout_delta()
-{
-  return to_now - to_start;
-}
+#define get_time_ms()   (*(volatile uint16_t far *) MK_FP(0x40, 0x6c) * 55)
+#define timeout_start() (to_start = get_time_ms())
+#define timeout_now()   (to_now = get_time_ms())
+#define timeout_delta() (to_now - to_start)
 
 /**
  * @brief Get next character, wait if not available.
