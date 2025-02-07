@@ -34,5 +34,7 @@ static void __interrupt __far intf5(union INTPACK r)
 
 void setf5(void)
 {
+#ifdef INTF5_RELOC_IS_FIXED
     _dos_setvect(0xF5, intf5);
+#endif
 }

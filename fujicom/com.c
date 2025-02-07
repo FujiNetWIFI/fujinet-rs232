@@ -72,6 +72,7 @@
  * It will be restored when the port is closed.
  */
 static PORT far *com = NULL;
+#if 0
 static void (interrupt far *old_break_handler) ();
 
 /*
@@ -85,6 +86,7 @@ void interrupt far break_handler()
 {
 
 }
+#endif
 
 /*
  * This is the interrupt service routine for the COM port.
@@ -175,8 +177,8 @@ PORT far *port_open(PORT far *port, int address, int int_number)
   port->interrupt_number = int_number;
   port->old_vector = getvect(int_number);
   //setvect(int_number, interrupt_service_routine);
-  old_break_handler = getvect(BREAK_VECTOR);
-  setvect(BREAK_VECTOR, break_handler);
+  //old_break_handler = getvect(BREAK_VECTOR);
+  //setvect(BREAK_VECTOR, break_handler);
   temp = (char) inportb(INT_CONTROLLER + 1);
   outportb(INT_CONTROLLER + 1, ~port->irq_mask & temp);
   return (port);
@@ -267,8 +269,8 @@ void port_close(PORT far *port)
   outportb(port->uart_base + IER, 0);
   temp = (uint8_t) inportb(INT_CONTROLLER + 1);
   outportb(INT_CONTROLLER + 1, port->irq_mask | temp);
-  setvect(port->interrupt_number, port->old_vector);
-  setvect(BREAK_VECTOR, old_break_handler);
+  //setvect(port->interrupt_number, port->old_vector);
+  //setvect(BREAK_VECTOR, old_break_handler);
   outportb(port->uart_base + MCR, 0);
 }
 
