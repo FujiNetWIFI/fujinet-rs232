@@ -70,10 +70,10 @@ uint16_t Init_cmd(SYSREQ far *req)
 	   " on MS-DOS %i.%i\n",
 	   CC_VERSION_MAJOR, CC_VERSION_MINOR,
 	   regs.h.al, regs.h.ah);
-  unused = parse_config(req->req_type.init_req.BPB_ptr);
+  unused = parse_config(req->init.bpb_ptr);
   environ = (char **) &config_env;
 
-  req->req_type.init_req.end_ptr = MK_FP(getCS(), (uint8_t *) &driver_end - unused);
+  req->init.end_ptr = MK_FP(getCS(), (uint8_t *) &driver_end - unused);
 
   fujicom_init();
   check_uart();
@@ -91,7 +91,7 @@ uint16_t Init_cmd(SYSREQ far *req)
     int idx;
 
 
-    req->req_type.init_req.num_of_units = FN_MAX_DEV;
+    req->init.num_units = FN_MAX_DEV;
 
     for (idx = 0; idx < FN_MAX_DEV; idx++) {
       /* 5.25" 360k BPB */
@@ -112,7 +112,7 @@ uint16_t Init_cmd(SYSREQ far *req)
     }
 
     fn_bpb_pointers[idx] = NULL;
-    req->req_type.build_bpb_req.BPB_table = MK_FP(getCS(), fn_bpb_pointers);
+    req->bpb.table = MK_FP(getCS(), fn_bpb_pointers);
   }
 
   setf5();
