@@ -16,7 +16,7 @@ LDFLAGS = &
 	LIBPATH ../fujicom
 
 CFILES  = commands.c dispatch.c init.c print.c intf5.c
-AFILES  = header.asm
+AFILES  = header.asm iwrap.asm
 OBJS = $(CFILES:.c=.obj) $(AFILES:.asm=.obj)
 
 $(TARGET): $(OBJS)
