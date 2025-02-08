@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 
-/* Print a single character */
+#ifdef DOS_SAFE
+/* Print a single character with DOS */
 extern void printChar(char);
 #pragma aux printChar =		\
   "mov ah, 0x2"			\
@@ -19,6 +20,15 @@ extern void printDTerm(const char *);
     "int    0x21"             \
     __parm [__dx]             \
     __modify [__ax __di __es];
+#else /* !DOS_SAFE */
+/* Print a single character with BIOS */
+extern void printChar(char);
+#pragma aux printChar =         \
+  "mov ah, 0xE"                 \
+  "int 0x10"                    \
+  __parm [__al]                 \
+  __modify [__ax __cx];
+#endif /* DOS_SAFE */
 
 extern void printHex(uint16_t val, uint16_t width, char leading);
 extern void printHex32(uint32_t val, uint16_t width, char leading);

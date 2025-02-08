@@ -116,7 +116,7 @@ uint16_t Init_cmd(SYSREQ far *req)
   }
 
   setf5();
-  printDTerm("INT F5 Functions installed.\r\n$");
+  consolef("INT F5 Functions installed.\n");
   
   return OP_COMPLETE;
 }
@@ -140,22 +140,9 @@ uint8_t get_set_time(uint8_t set_flag)
   }
 
   year_wcen = cur_time.tm_year + 2000;
-  printDTerm("Current FujiNet date & time: $");
-  printDec(cur_time.tm_month, 2, '0');
-  printDTerm("/$");
-  printDec(cur_time.tm_mday, 2, '0');
-  printDTerm("/$");
-  printDec(year_wcen, 4, '0');
-
-  printDTerm(" $");
-
-  printDec(cur_time.tm_hour, 2, '0');
-  printDTerm(":$");
-  printDec(cur_time.tm_min, 2, '0');
-  printDTerm(":$");
-  printDec(cur_time.tm_sec, 2, '0');
-
-  printDTerm("\r\n$");
+  consolef("Current FujiNet date & time: %02i/%02i/%04i %02i:%02i:%02i\n",
+	   cur_time.tm_month, cur_time.tm_mday, year_wcen,
+	   cur_time.tm_hour, cur_time.tm_min, cur_time.tm_sec);
 
   if (set_flag) {
     regs.h.ah = 0x2B;
@@ -173,7 +160,7 @@ uint8_t get_set_time(uint8_t set_flag)
 
     intdos(&regs, &regs);
 
-    printDTerm("MS-DOS Time now set from FujiNet\r\n$");
+    consolef("MS-DOS Time now set from FujiNet\n$");
   }
 
   return 0;

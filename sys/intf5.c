@@ -1,12 +1,56 @@
-#include <dos.h>
-#include <i86.h>
-#include <fujicom.h>
 #include "print.h"
+#include "commands.h"
+#include "dispatch.h"
+#include "pushpop.h"
+#include <dos.h>
+#include <fujicom.h>
 
 static cmdFrame_t _cmdFrame;
 
 #pragma data_seg("_CODE")
 
+#define INTF5_NEAR
+#ifdef INTF5_NEAR
+void intf5(uint16_t dirdev, uint16_t command, uint16_t aux,
+	   void far *ptr, uint16_t length)
+#pragma aux intf5 __parm [ax] [cx] [dx] [es bx] [di] value [ax]
+{
+    int reply;
+
+    _enable();
+
+    consolef("INT F5\n");
+    consolef("Dev: %04x Cmd: %04x Aux: %04x\n",
+	     dirdev, command, aux);
+
+    _cmdFrame.device = dirdev;
+    _cmdFrame.comnd  = command;
+    _cmdFrame.aux1   = aux & 0xff;
+    _cmdFrame.aux2   = aux >> 8;
+
+    switch (dirdev)
+    {
+    case FUJIINT_NONE:  // No Payload
+        reply = fujicom_command(&_cmdFrame);
+        break;
+    case FUJIINT_READ:  // READ (Fujinet -> PC)
+        reply = fujicom_command_read(&_cmdFrame, ptr, length);
+        break;
+    case FUJIINT_WRITE: // WRITE (PC -> FujiNet)
+        reply = fujicom_command_write(&_cmdFrame, ptr, length);
+        break;
+    }
+
+    consolef("INT F5 out\n");
+
+    _asm {
+        mov ax, reply;
+	iret;
+    }
+
+    // IRET
+}
+#else /* !INTF5_NEAR */
 static void __interrupt __far intf5(union INTPACK r)
 {
     _enable();
@@ -31,10 +75,9 @@ static void __interrupt __far intf5(union INTPACK r)
 
     // IRET
 }
+#endif /* INTF5_NEAR */
 
 void setf5(void)
 {
-#ifdef INTF5_RELOC_IS_FIXED
-    _dos_setvect(0xF5, intf5);
-#endif
+  _dos_setvect(0xF5, MK_FP(getCS(), intf5));
 }

@@ -105,17 +105,34 @@ void dumpHex(void far *ptr, uint16_t count)
 
   for (outer = 0; outer < count; outer += 16) {
     printHex(outer, 4, '0');
+#ifdef DOS_SAFE
     printDTerm("  $");
+#else
+    printChar(' ');
+    printChar(' ');
+#endif /* DOS_SAFE */
     for (inner = 0; inner < 16; inner++) {
       if (inner + outer < count) {
         c = buffer[inner + outer];
 	printHex(c, 2, '0');
 	printChar(' ');
       }
-      else
+      else {
+#ifdef DOS_SAFE
 	printDTerm("   $");
+#else
+	printChar(' ');
+	printChar(' ');
+	printChar(' ');
+#endif /* DOS_SAFE */
+      }
     }
+#ifdef DOS_SAFE
     printDTerm(" |$");
+#else
+    printChar(' ');
+    printChar('|');
+#endif /* DOS_SAFE */
     for (inner = 0; inner < 16 && inner + outer < count; inner++) {
       c = buffer[inner + outer];
       if (c >= ' ' && c <= 0x7f)
@@ -123,7 +140,13 @@ void dumpHex(void far *ptr, uint16_t count)
       else
 	printChar('.');
     }
+#ifdef DOS_SAFE
     printDTerm("|\r\n$");
+#else
+    printChar('|');
+    printChar('\r');
+    printChar('\n');
+#endif /* DOS_SAFE */
   }
 
   return;
@@ -142,7 +165,12 @@ void consolef(const char *format, ...)
   for (pf = format; pf && *pf; pf++) {
     switch (*pf) {
     case '\n':
+#ifdef DOS_SAFE
       printDTerm("\r\n$");
+#else
+      printChar('\r');
+      printChar('\n');
+#endif /* DOS_SAFE */
       break;
 
     case '%':
