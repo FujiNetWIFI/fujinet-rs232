@@ -1,8 +1,10 @@
 _TEXT	segment word public 'CODE'
-	public	int_wrapper_
 	extern	intf5_:near
 
-int_wrapper_:
+	; Macro to create an interrupt wrapper for a given C function
+INTERRUPT MACRO func
+	PUBLIC func&vect_
+	func&vect_ PROC NEAR
 	push	bx
 	push	cx
 	push	dx
@@ -16,7 +18,7 @@ int_wrapper_:
 	push	cs
 	pop	ds
 
-	call	intf5_
+	call	func
 
 	pop	es
 	pop	ds
@@ -27,6 +29,10 @@ int_wrapper_:
 	pop	cx
 	pop	bx
 	iret
+	func&vect_ ENDP
+ENDM
+
+	INTERRUPT	intf5_
 
 _TEXT	ends
 

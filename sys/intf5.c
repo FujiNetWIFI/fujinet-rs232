@@ -50,10 +50,10 @@ int intf5(uint16_t direction, uint16_t devcom, uint16_t aux, void far *ptr, uint
 
 void setf5(void)
 {
-    extern void int_wrapper();
+    extern void intf5_vect();
     void far *farptr;
 
-    farptr = MK_FP(getCS(), int_wrapper);
-    consolef("SET F5 %04x %08lx\n", int_wrapper, (uint32_t) farptr);
+    farptr = MK_FP(getCS(), intf5_vect);
+    consolef("SET F5 %08lx\n", (uint32_t) farptr);
     _dos_setvect(0xF5, farptr);
 }
