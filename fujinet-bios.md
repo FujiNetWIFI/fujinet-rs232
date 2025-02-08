@@ -1,802 +1,278 @@
 # FujiNet PC BIOS Specification
 
-## Reference
+The FujiNet PC BIOS Specification reserves software INT F5 to provide a standardized way to communicate with the FujiNet, regardless of how it is physically connected. It is designed to send any command that the PC FujiNet can interpret, to any of its virtual devices, with or without payload, to or from the PC or FujiNet.
 
-### INT F5H - FujiNet Control
+The current version of this document may be found on wiki: 
+https://github.com/FujiNetWIFI/fujinet-firmware/wiki/MS%E2%80%90DOS-BIOS-Specification
 
-#### (AH = 0xFF) RESET FUJINET
+## Canonical implementation
 
-| Register | Value |
-|----------|-------|
-| AH       | 0xFF  |
+Can be found here: https://github.com/FujiNetWIFI/fujinet-rs232/tree/main/sys
 
-#### (AH = 0xFE) GET CURRENT SSID
+## Registers Used
 
-| Register | Value                                                  |
-|----------|--------------------------------------------------------|
-| AH       | 0xFE                                                   |
-| ES:BX    | Destination Segment (ES) and Offset (BX) for SSID Data |
+| Register | Description                            |
+|---       |---                                     |
+| AH       | 00 = No Payload, 40 = READ, 80 = WRITE |
+| AL       | Subdevice                              |
+| BX       | OFFSET for payload buffer              |
+| CL       | Command                                |
+| DH       | AUX 2                                  |
+| DL       | AUX 1                                  |
+| DI       | Length of Payload Buffer               |
+| ES       | SEGMENT for payload buffer             |
 
-The target buffer will be filled with 97 bytes of data:
+** Note: ** ES, DI and BX are not used for AH=00
 
-| Offset | Length | Value                                       |
-|--------|--------|---------------------------------------------|
-| 0      | 33     | NULL terminated string containing WiFi SSID |
-| 34     | 64     | NULL terminated string containing PSK       |
+** Note: ** ES:BX Specifies the far location in memory of a payload buffer. DI specifies its length.
 
-#### (AH = 0xFD) SCAN NETWORKS
+## Register AH - Set Payload direction
 
-| Register | Value |
-|----------|-------|
-| AH       | 0xFD  |
+The BIOS has exactly three functions; set by register AH. These differ in how any payload is handled, and in which direction the payload should be sent.
 
-The number of found networks will be returned in AL.
+| AH   | Description                                                                      |
+|---   |---                                                                               |
+| 0x00 | No payload, Just send the command in the command frame.                          |
+| 0x40 | READ. Payload comes from the FujiNet to the PC to address in ES:BX, length in DI |
+| 0x80 | WRITE. Payload comes from PC to the FujiNet via address in ES:BX, length in DI   |
 
-#### (AH = 0xFC) GET SCAN RESULT
+## Register AL - Set Device ID
 
-| Register | Value                                                      |
-|----------|------------------------------------------------------------|
-| AH       | 0xFC                                                       |
-| AL       | An Index equal or less than # of networks returned by 0xFD |
-| ES:BX    | Destination Segment (ES) and Offset (BX) for SSID Result   |
+The FujiNet has a number of virtual devices, all referenced by device ID. Register AL specifies the destination device for the command.
 
-The target buffer will contain 34 bytes of data:
+| AL   | Description |
+|---   |--- |
+| 0x31 | Disk Drive (block device) #1  |
+| 0x32 | Disk Drive (block device) #2  |
+| 0x33 | Disk Drive (block device) #3  |
+| 0x34 | Disk Drive (block device) #4  |
+| 0x35 | Disk Drive (block device) #5  |
+| 0x36 | Disk Drive (block device) #6  |
+| 0x37 | Disk Drive (block device) #7  |
+| 0x38 | Disk Drive (block device) #8  |
+| 0x45 | Real Time Clock (NTP)         |
+| 0x70 | FujiNet Control Device        |
+| 0x71 | Network (character device) #1 | 
+| 0x72 | Network (character device) #2 | 
+| 0x73 | Network (character device) #3 | 
+| 0x74 | Network (character device) #4 | 
+| 0x75 | Network (character device) #5 | 
+| 0x76 | Network (character device) #6 | 
+| 0x77 | Network (character device) #7 | 
+| 0x78 | Network (character device) #8 | 
 
-| Offset | Length | Value                                     |
-| 0      | 33     | SSID as NULL terminated string            |
-| 34     | 1      | RSSI strength (dBm from negative to zero) |
+## Register/Segment ES:BX
 
-#### (AH = 0xFB) SET SSID AND CONNECT
+ES:BX is used to specify the segment and offset location of a buffer in the PC.
 
-| Register | Value                                         |
-|----------|-----------------------------------------------|
-| AH       | 0xFB                                          |
-| ES:BX    | Pointer to SSID Information                   |
-| CL       | 1 = Ask FujiNet to save SSID, 0 = Do not save |
+* For NONE (0x00) operations, there is no payload, and this segment and offset pair is not used.
 
-The source buffer should contain the following data at ES:BX:
+* For READ (0x40) operations, this indicates a destination buffer for data coming from the FujiNet.
 
-| Offset | Length | Value                                       |
-|--------|--------|---------------------------------------------|
-| 0      | 33     | NULL terminated string containing WiFi SSID |
-| 34     | 64     | NULL terminated string containing PSK       |
+* For WRITE (0x80) operations, this indicates a source buffer for data going to the FujiNet.
 
+## Register DI
 
-#### (AH = 0xFA) GET WIFI STATUS
+The DI index register is used to specify the length of the payload buffer. This parameter is required if AH is either 0x40 or 0x80, and is ignored if it is 0x00.
 
-| Register | Value |
-|----------|-------|
-| AH       | 0xFA  |
+## Register CL
 
-The following WIFI status values are returned in AL:
+The low register of CX (CL) is used to specify the command byte. CH is currently not used.
 
-| Value | Description                   |
-|-------|-------------------------------|
-| 0     | WIFI is idle.                 |
-| 1     | No SSID available.            |
-| 2     | Scan completed.               |
-| 3     | Connected to SSID and active. |
-| 4     | Most recent connect failed.   |
-| 5     | WiFi Connection Lost          |
-| 6     | WiFi Explicitly Disconnected  |
+For example, the commands from these pages can be used:
 
-#### (AH = 0xF9) MOUNT HOST
+* [[SIO Commands for Device IDs $31 to $38]]
+* [[SIO Commands for Device ID $45]]
+* [[SIO Commands for Device ID $70]]
+* [[SIO Commands for Device IDs $71 to $78]]
 
-| Register | Value                |
-|----------|----------------------|
-| AH       | 0xF9                 |
-| AL       | Host slot # to mount |
+## Register DX (DL and DH)
 
-#### (AH = 0xF8) MOUNT DEVICE IMAGE
+Register DX is used to pass the AUX1 and AUX2 values for any command. These are sent as part of the command frame, and can be treated either as two 8-bit values, or a single 16-bit value. The values used for these are specific to each command and device.
 
-| Register | Value                        |
-|----------|------------------------------|
-| AH       | 0xF8                         |
-| CL       | Device Slot # to mount       |
-| CH       | Mode $01 = Read, $02 = Write |
+For example, The block devices (0x31 - 0x38) use AUX1 and AUX2 to specify a 16-bit sector value for READ and WRITE commands.
 
-> **_NOTE:_** The device slots should be populated using both the WRITE DEVICE SLOTS and SET FILENAME FOR DEVICE SLOT commands, before using this command.
+## Return Value
 
-#### (AH = 0xF7) OPEN DIRECTORY
+For any command sent to INT F5, the AL register will contain the result code as a single 8-bit character. Valid result codes are:
 
-| Register | Value                                                                         |
-|----------|-------------------------------------------------------------------------------|
-| AH       | 0xF7                                                                          |
-| AL       | Host slot to perform open directory on.                                       |
-| ES:BX    | Pointer to 256 byte NULL terminated string containing desired directory path. |
+| Char | Description                                           |
+|---   |---                                                    |
+| 'C'  | Complete. The command finished without error.         |
+| 'E'  | Error. The command finished, but there was a problem. |
+| 'N'  | NAK. The command was not recognized by the device.    | 
 
-#### (AH = 0xF6) READ NEXT DIRECTORY ENTRY
-
-| Register | Value                                                                                       |
-|----------|---------------------------------------------------------------------------------------------|
-| AH       | 0xF6                                                                                        |
-| AL       | Desired Length of returned directory entry.                                                 |
-| ES:BX    | Pointer to destination for directory entry. Reserved space must be equal or greater than AL |
-| CL       | If bit 7 (0x80 is set), additional file details are returned, add 9 bytes to AL.            |
-
-* If bit 7 **is not** set, the next file name is returned.
+**Note:** A return value of 'A' is an ACK, but this should not be seen by the user programs, and indicates a potential protocol implementation error.
 
-* If bit 7 **is** set, additional file info is appended to the entry in the following format:
+## Assembler example
 
-| Byte | Item             | Description                               |
-|------|------------------|-------------------------------------------|
-| 0x00 | MODIFIED_YEAR    | File modified date-time, years since 1970 |
-| 0x01 | MODIFIED_MONTH   | File modified date-time, month (1-12)     |
-| 0x02 | MODIFIED_DAY     | File modified date-time, day (1-31)       |
-| 0x03 | MODIFIED_HOUR    | File modified date-time, hour (0-23)      |
-| 0x04 | MODIFIED_MINUTE  | File modified date-time, minute (0-59)    |
-| 0x05 | MODIFIED_SECONDS | File modified date-time, seconds (0-59)   |
-| 0x06 | FILE_SIZE_LO     | File size, lo byte                        |
-| 0x07 | FILE_SIZE_HI     | File size, hi byte                        |
-| 0x08 | FILE_FLAGS       | One or more file flags (see below)        |
-| 0x09 | FILE_TYPE        | One of the file types (see below)         |
+The following assembler example will send a command to reset the FujiNet by sending command 0xFF, to device 0x70. 
 
-File Flags
-
-| Flag     | Value | Description                                   |
-|----------|-------|-----------------------------------------------|
-| FF_DIR   | 0x01  | Entry is directory.                           |
-| FF_TRUNC | 0x02  | Entry was truncated to fit requested AL size. |
-
-File Types
-
-| Type       | Value | Description                       |
-|------------|-------|-----------------------------------|
-| FT_UNKNOWN | 0x00  | File type could not be determined |
-| FT_ATR     | 0x01  | ATR disk image format             |
-| FT_ATX     | 0x02  | ATX disk image format             |
-| FT_XEX     | 0x03  | XEX disk image format             |
-
-TODO: Add more disk types, we never added more, oops.
-
-#### (AH = 0xF5) CLOSE DIRECTORY
-
-| Register | Value                    |
-|----------|--------------------------|
-| AH       | 0xF5                     |
-| AL       | Host slot to close (0-7) |
-
-#### (AH = 0xF4) READ HOST SLOTS
-
-| Register | Value                                                                     |
-|----------|---------------------------------------------------------------------------|
-| AH       | 0xF4                                                                      |
-| ES:BX    | Pointer to a 256 byte buffer to hold all 8 hosts, 32 characters per host. |
-
-#### (AH = 0xF3) WRITE HOST SLOTS
-
-| Register | Value                                                                       |
-|----------|-----------------------------------------------------------------------------|
-| AH       | 0xF3                                                                        |
-| ES:BX    | Pointer to a 256 byte buffer to holding all 8 hosts, 32 characters per host |
-
-#### (AH = 0xF2) READ DEVICE SLOTS
-
-| Register | Value                                          |
-|----------|------------------------------------------------|
-| AH       | 0xF2                                           |
-| ES:BX    | Pointer to 304 byte buffer in the format below |
-
-The 304 byte buffer, is an array of 8 device slots, with the following format:
-
-| Offset | Size | Description                     |
-|--------|------|---------------------------------|
-| 0      | 1    | Host slot (0-7)                 |
-| 1      | 1    | Mode (0 = Read Only, 1 = write) |
-| 2      | 36   | Displayed filename              |
-
-#### (AH = 0xF1) WRITE DEVICE SLOTS
-
-| Register | Value                                          |
-|----------|------------------------------------------------|
-| AH       | 0xF1                                           |
-| ES:BX    | Pointer to 304 byte buffer in the format below |
-
-The 304 byte buffer, is an array of 8 device slots, with the following format:
-
-| Offset | Size | Description                     |
-|--------|------|---------------------------------|
-| 0      | 1    | Host slot (0-7)                 |
-| 1      | 1    | Mode (0 = Read Only, 1 = write) |
-| 2      | 36   | Displayed filename              |
-
-#### (AH = 0xF0) UDP STREAMING MODE
-
-| Register | Value                                                           |
-|----------|-----------------------------------------------------------------|
-| AH       | 0xF0                                                            |
-| ES:BX    | Pointer to 64 byte NULL terminated string containing host name. |
-| CX       | UDP Port number (0-65535)                                       |
-
-#### (AH = 0xEA) GET WIFI ENABLED
-
-| Register | Value |
-|----------|-------|
-| AH       | 0xEA  |
-
-Return value in AL, 0 = Disabled, 1 = Enabled.
-
-#### (AH = 0xE9) UNMOUNT DEVICE IMAGE
-
-| Register | Value                        |
-|----------|------------------------------|
-| AH       | 0xE9                         |
-| AL       | Device slot to unmount (0-7) |
-
-#### (AH = 0xE8) GET ADAPTER CONFIGURATION
-
-| Register | Value                                                                      |
-|----------|----------------------------------------------------------------------------|
-| AH       | 0xE8                                                                       |
-| ES:BX    | Pointer to 140 byte data structure to hold the AdapterConfig defined below |
-
-AdapterConfig Structure:
-
-| Offset | Size | Description                               |
-|--------|------|-------------------------------------------|
-| 0      | 33   | The current SSID                          |
-| 34     | 64   | The current host name                     |
-| 97     | 4    | Local IPv4 Address                        |
-| 101    | 4    | Gateway IPv4 Address                      |
-| 105    | 4    | IPv4 Network Mask                         |
-| 109    | 4    | DNS IPv4 Address                          |
-| 113    | 6    | MAC address                               |
-| 119    | 6    | BSSID                                     |
-| 125    | 15   | Fujinet version as NULL terminated string |
-
-#### (AH = 0xE7) CREATE NEW DISK IMAGE
-
-| Register | Value                                       |
-|----------|---------------------------------------------|
-| AH       | 0xE7                                        |
-| ES:BX    | Pointer to 262 byte buffer specified below: |
-
-The new disk buffer is in the following format:
-
-| Offset | Size | Description                                                     |
-|--------|------|-----------------------------------------------------------------|
-| 0      | 2    | Number of sectors (0-65535)                                     |
-| 2      | 2    | Sector size (512)                                               |
-| 4      | 1    | Host Slot (0-7)                                                 |
-| 5      | 1    | Device slot (0-7)                                               |
-| 6      | 256  | NULL terminated string containing full path to filename on host |
-
-TODO: change size of number of sectors to 4 bytes.
-
-#### (AH = 0xE6) UNMOUNT HOST
-
-| Register | Value           |
-|----------|-----------------|
-| AH       | 0xE6            |
-| AL       | Host Slot (0-7) |
-
-#### (AH = 0xE5) GET DIRECTORY POSITION
-
-| Register | Value |
-|----------|-------|
-| AH       | 0xE5  |
-
-The directory position (0-65535) is returned in AX.
-
-#### (AH = 0xE4) SET DIRECTORY POSITION
-
-| Register | Value                                |
-|----------|--------------------------------------|
-| AH       | 0xE4                                 |
-| CX       | Desired directory position (0-65535) |
-
-#### (AH = 0xE3) SET HSIO INDEX (NOT IMPLEMENTED)
-
-| Register | Value                |
-|----------|----------------------|
-| AH       | 0xE3                 |
-| AL       | High speed SIO index |
-
-#### (AH = 0xE2) SET FILENAME FOR DEVICE SLOT
-
-| Register | Value                                                                     |
-|----------|---------------------------------------------------------------------------|
-| AH       | 0xE2                                                                      |
-| AL       | Desired Device Slot (0-7)                                                 |
-| ES:BX    | Pointer to NULL terminated 256 byte string containing full path.          |
-| CL       | The desired host slot (0-7)                                               |
-| CH       | Bits 0-3 specify mode (0=read, 1=write), Bits 4-7 specify host slot (0-7) |
-
-#### (AH = 0xE1) SET HOST PREFIX
-
-| Register | Value                                                                      |
-|----------|----------------------------------------------------------------------------|
-| AH       | 0xE1                                                                       |
-| AL       | Host slot (0-7)                                                            |
-| ES:BX    | Pointer to NULL terminated 256 byte string containing the new host prefix. |
-
-#### (AH = 0xE0) GET HOST PREFIX
-
-| Register | Value                                                                     |
-|----------|---------------------------------------------------------------------------|
-| AH       | 0xE1                                                                      |
-| AL       | Host slot (0-7)                                                           |
-| ES:BX    | Pointer to NULL terminated 256 byte string to contain current host prefix |
-
-#### (AH = 0xDF) SET EXTERNAL SIO CLOCK RATE (NOT IMPLEMENTED)
-
-| Register | Value                          |
-|----------|--------------------------------|
-| AH       | 0xDF                           |
-| CX       | 16-bit value, LSB, rate in kHz |
-
-#### (AH = 0xDE) WRITE APP KEY
-
-| Register | Value                                                                           |
-|----------|---------------------------------------------------------------------------------|
-| AH       | 0xDE                                                                            |
-| ES:BX    | Pointer to buffer to write to FujiNet's App Key storage. Assumed to be CX bytes |
-| CX       | Length of data to store.                                                        |
-
-#### (AH = 0xDD) READ APP KEY
-
-| Register | Value                                                                                                            |
-|----------|------------------------------------------------------------------------------------------------------------------|
-| AH       | 0xDD                                                                                                             |
-| ES:BX    | Pointer to buffer in which to store the AppKey received from FujiNet app key storage. First two bytes are length |
-
-#### (AH = 0xDC) OPEN APP KEY
-
-| Register | Value                       |
-|----------|-----------------------------|
-| AH       | 0xDC                        |
-| AL       | open Mode (0=read, 1=write) |
-| BL       | Key ID                      |
-| BH       | App ID                      |
-| CX       | Creator ID                  |
-
-The app key registry is here: https://github.com/FujiNetWIFI/fujinet-firmware/wiki/SIO-Command-$DC-Open-App-Key
-
-#### (AH = 0xDB) CLOSE APP KEY
-
-| Register | Value |
-|----------|-------|
-| AH       | 0xDB  |
-
-#### (AH = 0xDA) GET DEVICE FILENAME
-
-| Register | Value                                  |
-|----------|----------------------------------------|
-| AH       | 0xDA                                   |
-| AL       | Device Slot (0-7)                      |
-| ES:BX    | Pointer to 256 byte area to hold path. |
-
-#### (AH = 0xD9) ENABLE OR DISABLE CONFIG IN DEVCE SLOT 1
-
-| Register | Value                   |
-|----------|-------------------------|
-| AH       | 0xD9                    |
-| AL       | 1 = Enable, 0 = Disable |
-
-#### (AH = 0xD8) COPY FILE FROM ONE HOST SLOT, TO ANOTHER
-
-| Register | Value                                                                    |
-|----------|--------------------------------------------------------------------------|
-| AH       | 0xD8                                                                     |
-| ES:BX    | Pointer to 256 byte NULL terminated string containing copy specification |
-| CL       | Source host slot (0-7)                                                   |
-| CH       | Destination host slot (0-7)                                              |
-
-The copy specification is a source path, and destination path seperated by the | character, e.g.
-
-``` text
-/sourcefolder/sourcefile.img|/destfolder/destfile.img
+```asm
+        MOV AH,00                ; No payload
+        MOV CL,FF                ; FF = Reset
+        INT F5                   ; Do it. AL contains result (e.g. 'C')
 ```
 
-#### (AH = 0xD7) MOUNT ALL
+## C Example 1: AH Function 0x40: FAC - Show FujiNet Adapter Config
 
-| Register | Value |
-|----------|-------|
-| AH       | 0xD7  |
+```c
+/**
+ * @brief   Display FujiNet Adapter Config
+ * @author  Thomas Cherryhomes
+ * @email   thom dot cherryhomes at gmail dot com
+ * @license gpl v. 3, see LICENSE for details
+ */
 
-#### (AH = 0xD6) SET BOOT MODE
+#include <dos.h>
 
-| Register | Value                 |
-|----------|-----------------------|
-| AH       | 0xD6                  |
-| AL       | Boot mode, see below. |
+typedef struct _adapterConfig
+{
+	char ssid[33];
+	char hostname[64];
+	unsigned char localIP[4];
+	unsigned char gateway[4];
+	unsigned char netmask[4];
+	unsigned char dnsIP[4];
+	unsigned char macAddress[6];
+	unsigned char bssid[6];
+	char fn_version[15];
+} AdapterConfig;
 
-Boot Mode:
+unsigned char get_adapterconfig(AdapterConfig *ac)
+{
+	union  REGS r;
+	struct SREGS sr;
 
-| Mode | Description              |
-|------|--------------------------|
-| 0    | Boot into CONFIG         |
-| 1    | Boot into mount-and-boot |
-| 2    | Boot into Game Lobby     |
+	r.h.ah = 0x40; /* READ               */
+	r.h.al = 0x70; /* FUJI Device        */
+	r.h.cl = 0xe8; /* Get Adapter Config */
+	r.x.di = sizeof(AdapterConfig);  /* Expecting 140 bytes */
+	
+	sr.es = FP_SEG(ac);
+	r.x.bx = FP_OFF(ac);
 
-#### (AH = 0xD5) ENABLE DEVICE
+	int86x(0xF5,&r,&r,&sr);
 
-| Register | Value     |
-|----------|-----------|
-| AH       | 0xD5      |
-| AL       | Device ID |
+	return r.h.al;	
+}
 
-#### (AH = 0xD4) DISABLE DEVICE
+void display_adapterconfig(AdapterConfig *ac)
+{
+	printf("-------------------------------------\r\n");
+	printf("Current FujiNet Network Configuration\r\n");
+	printf("-------------------------------------\r\n\r\n");
+	
+	printf("%20s %s\n","SSID:",ac->ssid);
+	printf("%20s %s\n","Host Name:",ac->hostname);
 
-| Register | Value     |
-|----------|-----------|
-| AH       | 0xD4      |
-| AL       | Device ID |
+	printf("%20s %u.%u.%u.%u\n","IPV4:",ac->localIP[0],
+					 ac->localIP[1],
+					 ac->localIP[2],
+					 ac->localIP[3]);
 
-#### (AH = 0xD3) RANDOM NUMBER (NOT IMPLEMENTED)
+	printf("%20s %u.%u.%u.%u\n","Gateway:",ac->gateway[0],
+					    ac->gateway[1],
+					    ac->gateway[2],
+					    ac->gateway[3]);
 
-| Register | Value |
-|----------|-------|
-| AH       | 0xD3  |
+	printf("%20s %u.%u.%u.%u\n","Netmask:",ac->netmask[0],
+					 ac->netmask[1],
+					 ac->netmask[2],
+					 ac->netmask[3]);
 
-TODO: Implement in firmware
+	printf("%20s %u.%u.%u.%u\n","DNS:",ac->dnsIP[0],
+					 ac->dnsIP[1],
+					 ac->dnsIP[2],
+					 ac->dnsIP[3]);
 
-Random integer is returned in AX (0-65535)
+	printf("%20s %02X:%02X:%02X:%02X:%02X:%02X\n","MAC:",ac->macAddress[0],
+							   ac->macAddress[1],
+							   ac->macAddress[2],
+							   ac->macAddress[3],
+							   ac->macAddress[4],
+							   ac->macAddress[5]);
 
-#### (AH = 0xD2) GET TIME (NOT IMPLEMENTED)
+	printf("%20s %02X:%02X:%02X:%02X:%02X:%02X\n","BSSID:",ac->bssid[0],
+							   ac->bssid[1],
+							   ac->bssid[2],
+							   ac->bssid[3],
+							   ac->bssid[4],
+							   ac->bssid[5]);
 
-| Register | Value |
-|----------|-------|
-| AH       | 0xD2  |
+	printf("%20s %s\n","Version:",ac->fn_version);
+}
 
-TODO: Implement in firmware
+int main(void)
+{
+	AdapterConfig ac;
+	unsigned char r; 
 
-#### (AH = 0xD1) DEVICE ENABLE STATUS (NOT IMPLEMENTED)
+	memset(&ac,0,sizeof(AdapterConfig));
 
-| Register | Value |
-|----------|-------|
-| AH       | 0xD1  |
+	r = get_adapterconfig(&ac);
 
-TODO: Implement in Firmware
+	if (r != 'C')
+	{
+		printf("get_adapterConfig returned: %02x",r);
+		printf("Could not fetch adapter config from FujiNet. Exiting.");
+		return 1;
+	}
 
-#### (AH = 0xD0) BASE64 ENCODE INPUT
+	display_adapterconfig(&ac);
 
-| Register | Value                                                    |
-|----------|----------------------------------------------------------|
-| AH       | 0xD0                                                     |
-| ES:BX    | Pointer to buffer of data to feed into base64 generator. |
-| CX       | Length of buffer (0-65535)                               |
-
-#### (AH = 0xCF) BASE64 ENCODE COMPUTE
-
-| Register | Value |
-|----------|-------|
-| AH       | 0xCF  |
-
-#### (AH = 0xCE) BASE64 ENCODE LENGTH
-
-| Register | Value |
-|----------|-------|
-| AH       | 0xCE  |
-
-Total length of computed BASE64 data is returned in BX = High 16 bits, AX = Low 16 bits.
-
-#### (AH = 0xCD) BASE64 ENCODE OUTPUT
-
-| Register | Value                                            |
-|----------|--------------------------------------------------|
-| AH       | 0xCD                                             |
-| ES:BX    | Pointer to destination buffer for BASE64 output. |
-
-#### (AH = 0xCC) BASE64 DECODE INPUT
-
-| Register | Value                                                    |
-|----------|----------------------------------------------------------|
-| AH       | 0xCC                                                     |
-| ES:BX    | Pointer to buffer of data to feed into base64 generator. |
-| CX       | Length of buffer (0-65535)                               |
-
-#### (AH = 0xCB) BASE64 DECODE COMPUTE
-
-| Register | Value |
-|----------|-------|
-| AH       | 0xCB  |
-
-#### (AH = 0xCA) BASE64 ENCODE LENGTH
-
-| Register | Value |
-|----------|-------|
-| AH       | 0xCA  |
-
-Total length of decoded BASE64 data is returned in BX = High 16 bits, AX = Low 16 bits.
-
-#### (AH = 0xC9) BASE64 ENCODE OUTPUT
-
-| Register | Value                                           |
-|----------|-------------------------------------------------|
-| AH       | 0xC9                                            |
-| ES:BX    | Pointer to destination buffer for binary output |
-
-#### (AH = 0xC8) HASH INPUT
-
-| Register | Value                                   |
-|----------|-----------------------------------------|
-| AH       | 0xC8                                    |
-| ES:BX    | Pointer to source buffer for hash input |
-| CX       | Length in bytes (0-65535                |
-
-#### (AH = 0xC7) HASH COMPUTE
-
-| Register | Value                 |
-|----------|-----------------------|
-| AH       | 0xC7                  |
-| AL       | Hash type, see below. |
-
-| Hash Type | Description |
-|-----------|-------------|
-| 0         | MD5         |
-| 1         | SHA1        |
-| 2         | SHA256      |
-| 3         | SHA512      |
-
-#### (AH = 0xC6) HASH LENGTH
-
-| Register | Value                                         |
-|----------|-----------------------------------------------|
-| AH       | 0xC6                                          |
-| AL       | Type of data to retrieve: 0 = binary, 1 = HEX |
-
-Total length of resulting hash is returned in AL
-
-#### (AH = 0xC5) HASH OUTPUT
-
-| Register | Value                                          |
-|----------|------------------------------------------------|
-| AH       | 0xC5                                           |
-| AL       | Type of data to retrieve: 0 = binary, 1 = HEX  |
-| ES:BX    | Pointer to destination buffer for hash output. |
-
-
-
-#### (AH = 0x00) GET ERROR ADDRESS
-
-| Register | Value |
-|----------|-------|
-| AH       | 0x00  |
-
-Returns far pointer to the address of the error byte in ES:BX
-
-### INT F6H - NETWORK ADAPTER
-
-#### (AH = 0x00) GET STATUS ADDRESS
-
-| Register | Value |
-|----------|-------|
-| AH       | 0x00  |
-
-Returns far pointer to the address of the status bytes in ES:BX
-
-The Status bytes are defined as follows
-
-| Offset | Length | Description                       |
-|--------|--------|-----------------------------------|
-| 0      | 2      | Number of bytes waiting (0-65535) |
-| 2      | 1      | Connected? (1 = true, 0 = false)  |
-| 3      | 1      | Error code                        |
-
-#### (AH = 0x20) - RENAME FILE
-
-| Register | Value                                                               |
-|----------|---------------------------------------------------------------------|
-| AH       | 0x20                                                                |
-| AL       | Unit Number (0-3)                                                   |
-| ES:BX    | Pointer to 256 byte NULL terminated string with URL, example below. |
-
-``` txt
-N:SMB://WINSHARE/PUBLIC/OLDFILE.TXT,NEWFILE.TXT
+	return 0;
+}
 ```
 
-#### (AH - 0x21) - DELETE FILE
+## Example 2: AH Function 0x80 - Set SSID
 
-| Register | Value                                   |
-|----------|-----------------------------------------|
-| AH       | 0x21                                    |
-| AL       | Unit Number (0-3)                       |
-| ES:BX    | Pointer to 256 byte NULL terminated URL |
+```c
+/**
+ * @brief   Set SSID/Password
+ * @author  Thomas Cherryhomes
+ * @email   thom dot cherryhomes at gmail dot com
+ * @license gpl v. 3, see COPYING for details.
+ */
 
-#### (AH - 0x25) - SEEK IN FILE
+#include <dos.h>
+#include <stdio.h>
+#include <fujicom.h>
 
-| Register | Value                   |
-|----------|-------------------------|
-| AH       | 0x25                    |
-| AL       | Unit Number (0-3)       |
-| BX       | LO 16-bit byte position |
-| CX       | HI 16-bit byte position |
+struct SETSSID
+{
+	char ssid[33];
+	char password[64];
+} ss;
 
-#### (AH - 0x26) - TELL IN FILE
+union REGS r;
+struct SREGS sr;
 
-| Register | Value             |
-|----------|-------------------|
-| AH       | 0x25              |
-| AL       | Unit Number (0-3) |
+int main(int argc, char *argv[])
+{
+	if (argc<3)
+		{
+			printf("setssid <ssid> <password>\r\n");
+			return 1;
+		}
 
-Return:
+	strcpy(ss.ssid,argv[1]);
+	strcpy(ss.password,argv[2]);
 
-| Register | Value                   |
-|----------|-------------------------|
-| BX       | LO 16-bit byte position |
-| CX       | HI 16-bit byte position |
+	r.h.ah = 0x80; /* WRITE */
+	r.h.al = 0x70; /* to FUJI device */
+	r.h.cl = 0xFB; /* Set SSID command */
 
-#### (AH - 0x2A) - MAKE DIRECTORY
+	/* set payload */
+	sr.es  = FP_SEG(&ss);
+	r.x.bx = FP_OFF(&ss);
+	r.x.di = sizeof(ss); /* payload size */
+	
 
-| Register | Value                                   |
-|----------|-----------------------------------------|
-| AH       | 0x2A                                    |
-| AL       | Unit Number 0-3)                        |
-| ES:BX    | Pointer to 256 byte NULL terminated URL |
+	int86x(0xF5,&r,&r,&sr);
 
-#### (AH - 0x2B) - REMOVE DIRECTORY
+	printf("Set SSID Returned '%c'\r\n",r.h.al);
 
-| Register | Value                                   |
-|----------|-----------------------------------------|
-| AH       | 0x2B                                    |
-| AL       | Unit Number (0-3)                       |
-| ES:BX    | Pointer to 256 byte NULL terminated URL |
-
-#### (AH - 0x2C) - CHANGE DIRECTORY
-
-| Register | Value                                   |
-|----------|-----------------------------------------|
-| AH       | 0x2C                                    |
-| AL       | Unit Number (0-3)                       |
-| ES:BX    | Pointer to 256 byte NULL terminated URL |
-
-#### (AH - 0x30) - GET CURRENT DIRECTORY
-
-| Register | Value                                  |
-|----------|----------------------------------------|
-| AH       | 0x30                                   |
-| AL       | Unit Number (0-3)                      |
-| ES:BX    | Pointer to buffer for path (256 bytes) |
-
-#### (AH = 0x41 'A') - ACCEPT CONNECTION
-
-Accepts connection from listening socket.
-
-| Register | Value             |
-|----------|-------------------|
-| AH       | 0x41 'A'          |
-| AL       | Unit Number (0-3) |
-
-#### (AH = 0x43 'C') - CLOSE CONNECTION
-
-Closes the network connection. Does nothing if the network device is not opened.
-
-| Register | Value    |
-|----------|----------|
-| AH       | 0x43 'C' |
-
-#### (AH - 0x44 'D') - CHANGE UDP DESTINATION ADDRESS
-
-Changes destination address for the next UDP packet.
-
-| Register | Value                            |
-|----------|----------------------------------|
-| AH       | 0x44 'D'                         |
-| AL       | Unit Number (0-3)                |
-| ES:BX    | 256 byte NULL terminated UDP URL |
-
-#### (AH = 0x4C 'M') - HTTP CHANNEL MODE
-
-Changes current HTTP channel mode
-
-| Register | Value             |
-|----------|-------------------|
-| AH       | 0x4C 'M'          |
-| AL       | Unit Number (0-3) |
-| CL       | HTTP Channel Mode |
-
-HTTP Channel Modes:
-
-| CL | Description     |
-|----|-----------------|
-| 0  | BODY            |
-| 1  | COLLECT HEADERS |
-| 2  | GET HEADERS     |
-| 3  | SET HEADERS     |
-| 4  | SET POST DATA   |
-
-For more information, see this page:
-https://github.com/FujiNetWIFI/fujinet-firmware/wiki/HTTP-Set-Channel-Mode
-
-#### (AH = 0x4E 'O') - OPEN CONNECTION
-
-Opens the network connection. 
-
-| Register | Value                                   |
-|----------|-----------------------------------------|
-| AH       | 0x4F 'O'                                |
-| AL       | Unit Number (0-3)                       |
-| ES:BX    | 256 byte NULL terminated string for URL |
-| CL       | Mode                                    |
-| CH       | Translation (not used)                  |
-
-for more info see:
-https://github.com/FujiNetWIFI/fujinet-firmware/wiki/N%3A-SIO-Command-%27O%27---Open
-
-#### (AH = 0x50 'P') - PARSE JSON
-
-Read open connection and parse JSON document to be used by JSON QUERY.
-
-| Register | Value             |
-|----------|-------------------|
-| AH       | 0x50 'P'          |
-| AL       | Unit Number (0-3) |
-
-#### (AH - 0x51 'Q') - QUERY JSON
-
-| Register | Value                                                  |
-|----------|--------------------------------------------------------|
-| AH       | 0x51 'Q'                                               |
-| AL       | Unit Number (0-3)                                      |
-| ES:BX    | 256 byte NULL terminated buffer with JSON Query String |
-
-#### (AH = 0x52 'R') - READ FROM CONNECTION
-
-Read from network connection
-
-| Register | Value                            |
-|----------|----------------------------------|
-| AH       | 0x52 'R'                         |
-| AL       | Unit Number (0-3)                |
-| ES:BX    | Destination buffer for read data |
-| CX       | Length of data                   |
-
-#### (AH = 0x53 'S') - EXPLICITLY GET STATUS
-
-| Register | Value                                |
-|----------|--------------------------------------|
-| AH       | 0x53 'S'                             |
-| AL       | Unit Number (0-3)                    |
-| ES:BX    | Destination for 4 byte status buffer |
-
-Status Buffer format:
-
-| Offset | Length | Description                     |
-|--------|--------|---------------------------------|
-| 0      | 2      | # of bytes waiting (0-65535)    |
-| 2      | 1      | 1 = connected, 0 = disconnected |
-| 3      | 1      | Error code                      |
-
-#### (AH = 0x57 'W') - WRITE TO CONNECTION
-
-Write to network connection
-
-| Register | Value                           |
-|----------|---------------------------------|
-| AH       | 0x57 'W'                        |
-| AL       | Unit Number (0-3)               |
-| ES:BX    | Buffer containing data to write |
-| CX       | Length of data                  |
-
-#### (AH = 0x63 'c') - CLOSE CLIENT CONNECTION
-
-Closes a connection previously 'A'ccepted.
-
-| Register | Value             |
-|----------|-------------------|
-| AH       | 0x63 'c'          |
-| AL       | Unit Number (0-3) |
-
-#### (AH - 0xFC) - SET CHANNEL MODE
-
-| Register | Value                |
-| AH       | 0xFC                 |
-| AL       | Unit Number (0-3)    |
-| CL       | 0 = Normal, 1 = JSON |
-
-#### (AH - 0xFD) - SET USER NAME
-
-| Register | Value                                                            |
-|----------|------------------------------------------------------------------|
-| AH       | 0xFD                                                             |
-| AL       | Unit Number (0-3)                                                |
-| ES:BX    | Pointer to 256 byte buffer (NULL terminated)containing username. |
-
-#### (AH - 0xFE) - SET PASSWORD
-
-| Register | Value                                                            |
-|----------|------------------------------------------------------------------|
-| AH       | 0xFE                                                             |
-| AL       | Unit Number (0-3)                                                |
-| ES:BX    | Pointer to 256 byte buffer (NULL terminated)containing username. |
+	return 0;
+}
+```

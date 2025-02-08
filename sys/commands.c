@@ -12,12 +12,12 @@
 
 extern void End_code(void);
 
-struct BPB_struct fn_bpb_table[FN_MAX_DEV];
-struct BPB_struct *fn_bpb_pointers[FN_MAX_DEV + 1]; // leave room for the NULL terminator
+DOS_BPB fn_bpb_table[FN_MAX_DEV];
+DOS_BPB *fn_bpb_pointers[FN_MAX_DEV + 1]; // leave room for the NULL terminator
 
 static uint8_t sector_buf[SECTOR_SIZE];
 static cmdFrame_t cmd; // FIXME - make this shared with init.c?
-static struct BPB_struct active_bpb[FN_MAX_DEV];
+static DOS_BPB active_bpb[FN_MAX_DEV];
 
 // time_t on FujiNet is 64 bits but that is too large to work
 // with. Allocate twice as many 32b bit ints.
@@ -58,11 +58,11 @@ uint16_t Media_check_cmd(SYSREQ far *req)
 #endif
 
   if (!new_status)
-    req->req_type.media_check_req.return_info = 0;
+    req->media.return_info = 0;
   else if (old_status != new_status)
-    req->req_type.media_check_req.return_info = -1;
+    req->media.return_info = -1;
   else
-    req->req_type.media_check_req.return_info = 1;
+    req->media.return_info = 1;
 
   return OP_COMPLETE;
 }
@@ -83,21 +83,21 @@ uint16_t Build_bpb_cmd(SYSREQ far *req)
   cmd.aux1 = cmd.aux2 = 0;
 
   // DOS gave us a buffer to use?
-  buf = req->req_type.build_bpb_req.buffer_ptr;
+  buf = req->bpb.buffer_ptr;
   reply = fujicom_command_read(&cmd, buf, sizeof(sector_buf));
   if (reply != 'C') {
     consolef("FujiNet read fail: %i\n", reply);
     return ERROR_BIT | READ_FAULT;
   }
 
-  _fmemcpy(fn_bpb_pointers[req->unit], &buf[0x0b], sizeof(struct BPB_struct));
+  _fmemcpy(fn_bpb_pointers[req->unit], &buf[0x0b], sizeof(DOS_BPB));
 
 #if 0
   consolef("BPB for %i\n", req->unit);
-  dumpHex((uint8_t far *) fn_bpb_pointers[req->unit], sizeof(struct BPB_struct));
+  dumpHex((uint8_t far *) fn_bpb_pointers[req->unit], sizeof(DOS_BPB));
 #endif
 
-  req->req_type.build_bpb_req.BPB_table = MK_FP(getCS(), fn_bpb_pointers[req->unit]);
+  req->bpb.table = MK_FP(getCS(), fn_bpb_pointers[req->unit]);
 
   return OP_COMPLETE;
 }
@@ -110,8 +110,8 @@ uint16_t Ioctl_input_cmd(SYSREQ far *req)
 uint16_t Input_cmd(SYSREQ far *req)
 {
   int reply;
-  uint16_t idx, sector = req->req_type.i_o_req.start_sector;
-  uint8_t far *buf = req->req_type.i_o_req.buffer_ptr;
+  uint16_t idx, sector = req->io.start_sector;
+  uint8_t far *buf = req->io.buffer_ptr;
 
 
   if (req->unit >= FN_MAX_DEV) {
@@ -124,7 +124,7 @@ uint16_t Input_cmd(SYSREQ far *req)
   consolef("SECTOR: 0x%x\n", sector);
 #endif
 
-  for (idx = 0; idx < req->req_type.i_o_req.count; idx++, sector++) {
+  for (idx = 0; idx < req->io.count; idx++, sector++) {
     if (sector >= fn_bpb_table[req->unit].num_sectors) {
       consolef("FN Invalid sector read %i on %c:\n", sector, 'A' + req->unit);
       return ERROR_BIT | NOT_FOUND;
@@ -142,7 +142,7 @@ uint16_t Input_cmd(SYSREQ far *req)
   if (!idx)
     return ERROR_BIT | GENERAL_FAIL;
 
-  req->req_type.i_o_req.count = idx;
+  req->io.count = idx;
   return OP_COMPLETE;
 }
 
@@ -163,13 +163,13 @@ uint16_t Input_flush_cmd(SYSREQ far *req)
 
 uint16_t Output_cmd(SYSREQ far *req)
 {
-  req->req_type.i_o_req.count = 0;
+  req->io.count = 0;
   return OP_COMPLETE;
 }
 
 uint16_t Output_verify_cmd(SYSREQ far *req)
 {
-  req->req_type.i_o_req.count = 0;
+  req->io.count = 0;
   return OP_COMPLETE;
 }
 
@@ -210,13 +210,13 @@ uint16_t Ioctl_cmd(SYSREQ far *req)
 
 uint16_t Get_l_d_map_cmd(SYSREQ far *req)
 {
-  req->req_type.l_d_map_req.unit_code = 0;
+  req->ldmap.unit_code = 0;
   return OP_COMPLETE;
 }
 
 uint16_t Set_l_d_map_cmd(SYSREQ far *req)
 {
-  req->req_type.l_d_map_req.unit_code = 0;
+  req->ldmap.unit_code = 0;
   return OP_COMPLETE;
 }
 

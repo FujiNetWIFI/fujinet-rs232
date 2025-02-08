@@ -8,8 +8,8 @@ extern __segment getCS(void);
 #pragma aux getCS = \
     "mov ax, cs";
 
-extern struct BPB_struct fn_bpb_table[];
-extern struct BPB_struct *fn_bpb_pointers[];
+extern DOS_BPB fn_bpb_table[];
+extern DOS_BPB *fn_bpb_pointers[];
 
 extern uint16_t Init_cmd(SYSREQ far *req);
 extern uint16_t Media_check_cmd(SYSREQ far *req);
