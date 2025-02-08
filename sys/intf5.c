@@ -10,30 +10,28 @@ static cmdFrame_t _cmdFrame;
 #pragma data_seg("_CODE")
 
 /*
- * AH		== direction
+ * DL		== direction
  * AL		== device
- * CL		== command
- * DL		== aux1
- * DH		== aux2
+ * AH		== command
+ * CL		== aux1
+ * CX		== aux2
  * ES:BX	== far buffer pointer
  * DI		== buffer length
  */
-int intf5(uint16_t dirdev, uint16_t command, uint16_t aux, void far *ptr, uint16_t length)
-#pragma aux intf5 parm [ax] [cx] [dx] [es bx] [di] value [ax]
+int intf5(uint16_t direction, uint16_t devcom, uint16_t aux, void far *ptr, uint16_t length)
+#pragma aux intf5 parm [dx] [ax] [cx] [es bx] [di] value [ax]
 {
     int reply;
 
     _enable();
 
     consolef("INT F5 Dir: %04x Cmd: %04x Aux: %04x Ptr: %08lx Len: %04x\n",
-	     dirdev, command, aux, (uint32_t) ptr, length);
+	     direction, devcom, aux, (uint32_t) ptr, length);
 
-    _cmdFrame.device = dirdev & 0xff;
-    _cmdFrame.comnd  = command & 0xff;
-    _cmdFrame.aux1   = aux & 0xff;
-    _cmdFrame.aux2   = aux >> 8;
+    _cmdFrame.devcom = devcom;
+    _cmdFrame.aux = aux;
 
-    switch (dirdev >> 8)
+    switch (direction)
     {
     case FUJIINT_NONE: // No Payload
         reply = fujicom_command(&_cmdFrame);

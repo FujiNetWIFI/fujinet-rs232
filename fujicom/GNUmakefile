@@ -1,6 +1,8 @@
+WMAKE=wmake -h
+
 all:
-#	wmake -e CPPFLAGS=-DSERIAL_BPS=115200
-	wmake -e
+#	@$(WMAKE) -e CPPFLAGS=-DSERIAL_BPS=115200
+	@$(WMAKE) -e
 
 clean:
-	wmake clean
+	@$(WMAKE) clean

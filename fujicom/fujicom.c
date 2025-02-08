@@ -2,10 +2,11 @@
  * #FUJINET Low Level Routines
  */
 
-#define DEBUG
+#undef DEBUG
 
 #include "fujicom.h"
 #include "com.h"
+#include <dos.h>
 
 #ifdef DEBUG
 #include "../sys/print.h" // debug
@@ -23,6 +24,8 @@
 
 PORT fn_port;
 PORT far *port;
+union REGS f5regs;
+struct SREGS f5status;
 
 void fujicom_init(void)
 {
@@ -266,3 +269,21 @@ void fujicom_done(void)
   port_close(port);
   return;
 }
+
+int fujiF5(uint8_t direction, uint8_t device, uint8_t command, uint16_t aux,
+	   void far *buffer, uint16_t length)
+{
+  f5regs.x.dx = direction;
+  f5regs.h.al = device;
+  f5regs.h.ah = command;
+  f5regs.x.cx = aux;
+
+  f5status.es  = FP_SEG(buffer);
+  f5regs.x.bx = FP_OFF(buffer);
+  f5regs.x.di = length;
+
+  int86x(FUJINET_INT, &f5regs, &f5regs, &f5status);
+
+  return f5regs.x.ax;
+}
+

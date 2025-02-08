@@ -1,10 +1,10 @@
 # The 's' is for (S)mall memory model
 TARGET  = fujicoms.lib
-AS      = wasm
+AS      = wasm -q
 ASFLAGS = -0 -mt -bt=DOS
-CC      = wcc
+CC      = wcc -q
 CFLAGS  = -0 -bt=dos -ms -s -osh -zu $(CPPFLAGS)
-LIB     = wlib
+LIB     = wlib -q
 
 CFILES  = fujicom.c com.c
 OBJS = $(CFILES:.c=.obj) $(AFILES:.asm=.obj)

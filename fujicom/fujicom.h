@@ -18,13 +18,21 @@
 //         fujinet-firmware/lib/bus/rs232/rs232.h instead of
 //         redefining them here
 
-typedef struct {               /* Command Frame */
-  uint8_t device;              /* Destination Device */
-  uint8_t comnd;               /* Command */
-  uint8_t aux1;                /* Auxiliary Parameter 1 */
-  uint8_t aux2;                /* Auxiliary Parameter 2 */
-  uint8_t cksum;               /* 8-bit checksum */
+#pragma pack(push, 1)
+typedef union {               /* Command Frame */
+  struct {
+    uint8_t device;              /* Destination Device */
+    uint8_t comnd;               /* Command */
+    uint8_t aux1;                /* Auxiliary Parameter 1 */
+    uint8_t aux2;                /* Auxiliary Parameter 2 */
+    uint8_t cksum;               /* 8-bit checksum */
+  };
+  struct {
+    uint16_t devcom;
+    uint16_t aux;
+  };
 } cmdFrame_t;
+#pragma pack(pop)
 
 enum {
   DEVICEID_DISK                 = 0x31,
@@ -61,21 +69,21 @@ enum {
 /**
  * @brief start fujicom
  */
-void fujicom_init(void);
+extern void fujicom_init(void);
 
 /**
  * @brief calculate 8-bit checksum for cmdFrame_t.dcksum
  * @param buf Buffer to compute checksum against
  * @param len Length of aforementioned buffer
  */
-uint8_t fujicom_cksum(void far *ptr, uint16_t len);
+extern uint8_t fujicom_cksum(void far *ptr, uint16_t len);
 
 /**
  * @brief send FujiNet frame with no payload
  * @param cmdFrame Pointer to command frame
  * @return 'C'omplete, 'E'rror, or 'N'ak
  */
-int fujicom_command(cmdFrame_t far *c);
+extern int fujicom_command(cmdFrame_t far *c);
 
 /**
  * @brief send fujinet frame and read payload
@@ -83,7 +91,7 @@ int fujicom_command(cmdFrame_t far *c);
  * @param buf Pointer to buffer to receive
  * @param len Expected buffer length
  */
-int fujicom_command_read(cmdFrame_t far *c, void far *ptr, uint16_t len);
+extern int fujicom_command_read(cmdFrame_t far *c, void far *ptr, uint16_t len);
 
 /**
  * @brief send fujinet frame and write payload
@@ -91,11 +99,17 @@ int fujicom_command_read(cmdFrame_t far *c, void far *ptr, uint16_t len);
  * @param buf pointer to buffer to send.
  * @param len Length of buffer to send.
  */
-int fujicom_command_write(cmdFrame_t far *c, void far *ptr, uint16_t len);
+extern int fujicom_command_write(cmdFrame_t far *c, void far *ptr, uint16_t len);
 
 /**
  * @brief end fujicom
  */
 void fujicom_done(void);
+
+extern int fujiF5(uint8_t direction, uint8_t device, uint8_t command, uint16_t aux,
+		  void far *buffer, uint16_t length);
+#define fujiF5_none(d, c, a, b, l) fujiF5(FUJIINT_NONE, d, c, a, b, l)
+#define fujiF5_read(d, c, a, b, l) fujiF5(FUJIINT_READ, d, c, a, b, l)
+#define fujiF5_write(d, c, a, b, l) fujiF5(FUJIINT_WRITE, d, c, a, b, l)
 
 #endif /* _FUJICOM_H */

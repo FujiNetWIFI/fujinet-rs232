@@ -5,6 +5,7 @@
  * @license GPL v. 3, see LICENSE for details.
  */
 
+#include "fujicom.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,10 +24,6 @@ struct _status
 	unsigned char connected; /* Are we connected? 		*/
 	unsigned char error;	 /* error code	1-255		*/
 } status;
-
-/* Register packs for int86x() */
-union REGS r;
-struct SREGS sr;
 
 /**
  * @brief main nget function
@@ -62,16 +59,7 @@ int nget(char *src, char *dst)
 		strcpy(url,username);
 
 		/* Perform username command */
-		r.h.ah = 0x80;
-		r.h.al = 0x71;
-		r.h.cl = 0xFD;
-		r.x.dx = 0x0000;
-
-		sr.es  = FP_SEG(&url);
-		r.x.bx = FP_OFF(&url);
-		r.x.di = sizeof(url);
-
-		int86x(0xF5,&r,&r,&sr);
+		fujiF5_write(DEVICEID_FN_NETWORK, CMD_USERNAME, 0, &url, sizeof(url));
 	}
 
 	if (password)
@@ -80,48 +68,22 @@ int nget(char *src, char *dst)
 		strcpy(url,password);
 
 		/* Perform password command */
-		r.h.ah = 0x80;
-		r.h.al = 0x71;
-		r.h.cl = 0xFE;
-		r.x.dx = 0x0000;
-
-		sr.es  = FP_SEG(&url);
-		r.x.bx = FP_OFF(&url);
-		r.x.di = sizeof(url);
-
-		int86x(0xF5,&r,&r,&sr);
+		fujiF5_write(DEVICEID_FN_NETWORK, CMD_PASSWORD, 0, &url, sizeof(url));
 	}
 
 	memset(url,0,sizeof(url));
 	strcpy(url,src);
 
 	/* Perform OPEN command */
-        r.h.ah   = 0x80;
-	r.h.al   = 0x71;
-	r.h.cl   = 'O';
-	r.h.dl   = 0x04; /* READ ONLY */
-	r.h.dh   = 0x00; /* NO TRANSLATION */
-	
-	sr.es    = FP_SEG(&url);
-	r.x.bx   = FP_OFF(&url);
-	r.x.di   = sizeof(url);
-
-	int86x(0xF5,&r,&r,&sr);
+	// FIXME - define constants:
+	//r.h.dl   = 0x04; /* READ ONLY */
+	//r.h.dh   = 0x00; /* NO TRANSLATION */
+	fujiF5_write(DEVICEID_FN_NETWORK, CMD_OPEN, 0x0004, &url, sizeof(url));
 
  	delay(10);
 
 	/* Perform initial status command */
-	r.h.ah   = 0x40;
-	r.h.al   = 0x71;
-	r.h.cl   = 'S';
-	r.h.dh   = 0x00;
-	r.h.dl   = 0x00;
-
-	sr.es    = FP_SEG(&status);
-	r.x.bx   = FP_OFF(&status);
-	r.x.di   = sizeof(status);
-
-	int86x(0xF5,&r,&r,&sr);
+	fujiF5_read(DEVICEID_FN_NETWORK, CMD_STATUS, 0, &status, sizeof(status));
 
 	if (status.error > 1 && !status.bw)
 	{
@@ -148,17 +110,7 @@ int nget(char *src, char *dst)
 		delay(1);
 
 		/* Do read */
-		r.h.ah   = 0x40;
-		r.h.al   = 0x71;
-		r.h.cl   = 'R';
-		r.x.dx   = bw;
-
-		sr.es    = FP_SEG(&buf);
-		r.x.bx   = FP_OFF(&buf);
-		r.x.di   = bw;
-
-		int86x(0xF5,&r,&r,&sr);
-		reply = r.h.al;
+		reply = fujiF5_read(DEVICEID_FN_NETWORK, CMD_READ, bw, &buf, bw);
 
 		if (reply != 'C')
 		{
@@ -172,31 +124,16 @@ int nget(char *src, char *dst)
 		total += bw;
 
 		printf("%10lu bytes transferred.\r",total);
+		fflush(stdout);
 
 		delay(1);
 
 		/* Do next status */
-		r.h.ah = 0x40;
-		r.h.al = 0x71;
-		r.h.cl = 'S';
-		r.h.dl = 0x00;
-		r.h.dh = 0x00;
-
-		sr.es  = FP_SEG(&status);
-		r.x.bx = FP_OFF(&status);
-		r.x.di = sizeof(status);
-
-		int86x(0xF5,&r,&r,&sr);
+		fujiF5_read(DEVICEID_FN_NETWORK, CMD_STATUS, 0, &status, sizeof(status));
 	}
 
-bye:
 	/* Perform CLOSE command */
-	r.h.ah   = 0x00;
-	r.h.al   = 0x71;
-	r.h.cl   = 'C';
-	r.x.dx   = 0x0000;
-
-	int86(0xF5,&r,&r);
+	fujiF5_none(DEVICEID_FN_NETWORK, CMD_CLOSE, 0, NULL, 0);
 
 	fclose(fp);
 	
