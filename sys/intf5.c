@@ -15,18 +15,21 @@ static cmdFrame_t _cmdFrame;
  * AH		== command
  * CL		== aux1
  * CH		== aux2
+ * SI           == aux34
  * ES:BX	== far buffer pointer
  * DI		== buffer length
  */
-int intf5(uint16_t direction, uint16_t devcom, uint16_t aux, void far *ptr, uint16_t length)
-#pragma aux intf5 parm [dx] [ax] [cx] [es bx] [di] value [ax]
+int intf5(uint16_t direction, uint16_t devcom, uint16_t aux12, uint16_t aux34,
+	  void far *ptr, uint16_t length)
+#pragma aux intf5 parm [dx] [ax] [cx] [si] [es bx] [di] value [ax]
 {
     int reply;
 
     _enable();
 
     _cmdFrame.devcom = devcom;
-    _cmdFrame.aux = aux;
+    _cmdFrame.aux12 = aux12;
+    _cmdFrame.aux34 = aux34;
 
     switch (direction)
     {

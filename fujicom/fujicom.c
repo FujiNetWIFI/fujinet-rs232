@@ -87,7 +87,7 @@ int _fujicom_send_command(cmdFrame_t far *cmd)
 
 
   /* Calculate checksum and place in frame */
-  cmd->cksum = fujicom_cksum(cc, 4);
+  cmd->cksum = fujicom_cksum(cc, sizeof(cmdFrame_t) - sizeof(cmd->cksum));
 
   /* Assert DTR to indicate start of command frame */
   port_set_dtr(port, 1);
@@ -270,13 +270,14 @@ void fujicom_done(void)
   return;
 }
 
-int fujiF5(uint8_t direction, uint8_t device, uint8_t command, uint16_t aux,
-	   void far *buffer, uint16_t length)
+int fujiF5(uint8_t direction, uint8_t device, uint8_t command,
+	   uint16_t aux12, uint16_t aux34, void far *buffer, uint16_t length)
 {
   f5regs.x.dx = direction;
   f5regs.h.al = device;
   f5regs.h.ah = command;
-  f5regs.x.cx = aux;
+  f5regs.x.cx = aux12;
+  f5regs.x.si = aux34;
 
   f5status.es  = FP_SEG(buffer);
   f5regs.x.bx = FP_OFF(buffer);

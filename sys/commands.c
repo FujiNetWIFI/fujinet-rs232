@@ -38,8 +38,7 @@ uint16_t Media_check_cmd(SYSREQ far *req)
 
   cmd.device = DEVICEID_FUJINET;
   cmd.comnd = CMD_STATUS;
-  cmd.aux1 = STATUS_MOUNT_TIME_L;
-  cmd.aux2 = STATUS_MOUNT_TIME_H;
+  cmd.aux = STATUS_MOUNT_TIME;
 
   reply = fujicom_command_read(&cmd, mount_status, sizeof(mount_status));
   if (reply != 'C')
@@ -80,7 +79,7 @@ uint16_t Build_bpb_cmd(SYSREQ far *req)
 
   cmd.device = DEVICEID_DISK + req->unit;
   cmd.comnd = CMD_READ;
-  cmd.aux1 = cmd.aux2 = 0;
+  cmd.aux = 0;
 
   // DOS gave us a buffer to use?
   buf = req->bpb.buffer_ptr;
@@ -132,8 +131,7 @@ uint16_t Input_cmd(SYSREQ far *req)
 
     cmd.device = DEVICEID_DISK + req->unit;
     cmd.comnd = CMD_READ;
-    cmd.aux1 = sector & 0xFF;
-    cmd.aux2 = sector >> 8;
+    cmd.aux = sector;
 
     reply = fujicom_command_read(&cmd, &buf[idx * SECTOR_SIZE], SECTOR_SIZE);
     if (reply != 'C')

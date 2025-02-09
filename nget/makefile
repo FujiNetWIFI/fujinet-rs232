@@ -12,7 +12,7 @@ nget.exe: nget.obj
 nput.exe: nput.obj
 
 .obj.exe:
-	$(LD) $(LDFLAGS) NAME $@ file $< LIBRARY {fujicoms.lib clibs.lib}
+	$(LD) $(LDFLAGS) NAME $@ file {$< ../sys/print.obj} LIBRARY {fujicoms.lib clibs.lib}
 .c.obj: .AUTODEPEND
 	$(CC) $(CFLAGS) -fo=$@ $<
 .asm.obj: .AUTODEPEND

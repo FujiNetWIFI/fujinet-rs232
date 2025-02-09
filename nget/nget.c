@@ -59,7 +59,7 @@ int nget(char *src, char *dst)
 		strcpy(url,username);
 
 		/* Perform username command */
-		fujiF5_write(DEVICEID_FN_NETWORK, CMD_USERNAME, 0, &url, sizeof(url));
+		fujiF5_write(DEVICEID_FN_NETWORK, CMD_USERNAME, 0, 0, &url, sizeof(url));
 	}
 
 	if (password)
@@ -68,7 +68,7 @@ int nget(char *src, char *dst)
 		strcpy(url,password);
 
 		/* Perform password command */
-		fujiF5_write(DEVICEID_FN_NETWORK, CMD_PASSWORD, 0, &url, sizeof(url));
+		fujiF5_write(DEVICEID_FN_NETWORK, CMD_PASSWORD, 0, 0, &url, sizeof(url));
 	}
 
 	memset(url,0,sizeof(url));
@@ -78,12 +78,12 @@ int nget(char *src, char *dst)
 	// FIXME - define constants:
 	//r.h.dl   = 0x04; /* READ ONLY */
 	//r.h.dh   = 0x00; /* NO TRANSLATION */
-	fujiF5_write(DEVICEID_FN_NETWORK, CMD_OPEN, 0x0004, &url, sizeof(url));
+	fujiF5_write(DEVICEID_FN_NETWORK, CMD_OPEN, 0x0004, 0, &url, sizeof(url));
 
  	delay(10);
 
 	/* Perform initial status command */
-	fujiF5_read(DEVICEID_FN_NETWORK, CMD_STATUS, 0, &status, sizeof(status));
+	fujiF5_read(DEVICEID_FN_NETWORK, CMD_STATUS, 0, 0, &status, sizeof(status));
 
 	if (status.error > 1 && !status.bw)
 	{
@@ -110,7 +110,7 @@ int nget(char *src, char *dst)
 		delay(1);
 
 		/* Do read */
-		reply = fujiF5_read(DEVICEID_FN_NETWORK, CMD_READ, bw, &buf, bw);
+		reply = fujiF5_read(DEVICEID_FN_NETWORK, CMD_READ, bw, 0, &buf, bw);
 
 		if (reply != 'C')
 		{
@@ -129,11 +129,11 @@ int nget(char *src, char *dst)
 		delay(1);
 
 		/* Do next status */
-		fujiF5_read(DEVICEID_FN_NETWORK, CMD_STATUS, 0, &status, sizeof(status));
+		fujiF5_read(DEVICEID_FN_NETWORK, CMD_STATUS, 0, 0, &status, sizeof(status));
 	}
 
 	/* Perform CLOSE command */
-	fujiF5_none(DEVICEID_FN_NETWORK, CMD_CLOSE, 0, NULL, 0);
+	fujiF5_none(DEVICEID_FN_NETWORK, CMD_CLOSE, 0, 0, NULL, 0);
 
 	fclose(fp);
 	

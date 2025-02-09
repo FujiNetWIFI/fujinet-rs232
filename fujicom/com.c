@@ -313,8 +313,38 @@ int port_getc(PORT far *port)
 }
 
 static uint16_t to_start, to_now;
+
+#undef USE_PIT_COUNTER
+#ifdef USE_PIT_COUNTER
+
+static uint16_t to_rollover = 0;
+
+/* PIT Channel 0 is normally used for the system timer */
+static unsigned int get_time_ms()
+{
+  uint16_t now;
+  static uint16_t last = 0;
+
+
+  outp(0x43, 0x00);
+  now = inp(0x40);
+  now |= inp(0x40) << 8;
+
+  if (now > last)
+    to_rollover++;
+  last = now;
+
+  // Approximate sub-55ms resolution using counter fraction
+  return (to_rollover * 55) + ((65536 - now) >> 10);  // Roughly (x / 1024) * 55
+}
+
+#else /* ! USE_PIT_COUNTER */
+
 /* Read BIOS tick counter and approximate it as milliseconds */
 #define get_time_ms()   (*(volatile uint16_t far *) MK_FP(0x40, 0x6c) * 55)
+
+#endif /* USE_PIT_COUNTER */
+
 #define timeout_start() (to_start = get_time_ms())
 #define timeout_now()   (to_now = get_time_ms())
 #define timeout_delta() (to_now - to_start)
@@ -407,7 +437,7 @@ uint16_t port_getbuf(PORT far *port, uint8_t far *buf, uint16_t len, uint16_t ti
 
 
   _disable();
-  
+
   for (rlen = 0; rlen < len; rlen++, buf++) {
     timeout_start();
     for (;;) {
@@ -512,7 +542,7 @@ int port_identify_uart(PORT far *port)
   val >>= 6; // Isolate FIFO status bits
   if (!val)
     return UART_16450;
-  
+
   if (val != 3) {
     /* FIFOs don't work on UART_16550, turn it off */
     outportb(port->uart_base + FCR, 0x00);
