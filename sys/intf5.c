@@ -14,7 +14,7 @@ static cmdFrame_t _cmdFrame;
  * AL		== device
  * AH		== command
  * CL		== aux1
- * CX		== aux2
+ * CH		== aux2
  * ES:BX	== far buffer pointer
  * DI		== buffer length
  */
@@ -24,9 +24,6 @@ int intf5(uint16_t direction, uint16_t devcom, uint16_t aux, void far *ptr, uint
     int reply;
 
     _enable();
-
-    consolef("INT F5 Dir: %04x Cmd: %04x Aux: %04x Ptr: %08lx Len: %04x\n",
-	     direction, devcom, aux, (uint32_t) ptr, length);
 
     _cmdFrame.devcom = devcom;
     _cmdFrame.aux = aux;
@@ -44,16 +41,12 @@ int intf5(uint16_t direction, uint16_t devcom, uint16_t aux, void far *ptr, uint
         break;
     }
 
-    consolef("INT F5 Reply: %04x\n", reply);
     return reply;
 }
 
 void setf5(void)
 {
     extern void intf5_vect();
-    void far *farptr;
 
-    farptr = MK_FP(getCS(), intf5_vect);
-    consolef("SET F5 %08lx\n", (uint32_t) farptr);
-    _dos_setvect(0xF5, farptr);
+    _dos_setvect(0xF5, MK_FP(getCS(), intf5_vect));
 }

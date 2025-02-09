@@ -2,7 +2,7 @@
  * #FUJINET Low Level Routines
  */
 
-#undef DEBUG
+#define DEBUG
 
 #include "fujicom.h"
 #include "com.h"
