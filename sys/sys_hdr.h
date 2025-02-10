@@ -94,7 +94,7 @@ typedef struct {
   uint16_t spt;                 /* # of sectors per track */
   uint16_t heads;               /* # of heads */
   uint32_t hidden;              /* # of hidden sectors */
-  uint32_t num_of_sectors_32;   /* 32-bit # of sectors */
+  uint32_t num_sectors_32;      /* 32-bit # of sectors */
 } DOS_BPB;
 
 typedef struct {

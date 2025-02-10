@@ -109,7 +109,8 @@ uint16_t Ioctl_input_cmd(SYSREQ far *req)
 uint16_t Input_cmd(SYSREQ far *req)
 {
   int reply;
-  uint16_t idx, sector = req->io.start_sector;
+  uint16_t idx;
+  uint32_t sector;
   uint8_t far *buf = req->io.buffer_ptr;
 
 
@@ -120,12 +121,23 @@ uint16_t Input_cmd(SYSREQ far *req)
 
 #if 0
   dumpHex((uint8_t far *) req, req->length);
-  consolef("SECTOR: 0x%x\n", sector);
+  consolef("SECTOR: %i 0x%04x 0x%08lx\n", req->length,
+	   req->io.start_sector, (uint32_t) req->io.start_sector_32);
+#endif
+
+  if (req->length > 22)
+    sector = req->io.start_sector_32;
+  else
+    sector = req->io.start_sector;
+
+#if 0
+  consolef("SECTOR: %i 0x%08lx %i\n", req->length, sector, req->io.count);
 #endif
 
   for (idx = 0; idx < req->io.count; idx++, sector++) {
-    if (sector >= fn_bpb_table[req->unit].num_sectors) {
-      consolef("FN Invalid sector read %i on %c:\n", sector, 'A' + req->unit);
+    if (fn_bpb_table[req->unit].num_sectors && sector >= fn_bpb_table[req->unit].num_sectors
+	|| sector >= fn_bpb_table[req->unit].num_sectors_32) {
+      consolef("FN Invalid sector read %i on %i:\n", sector, req->unit);
       return ERROR_BIT | NOT_FOUND;
     }
 
@@ -156,19 +168,22 @@ uint16_t Input_status_cmd(SYSREQ far *req)
 
 uint16_t Input_flush_cmd(SYSREQ far *req)
 {
-  return OP_COMPLETE;
+  consolef("FN INPUT FLUSH\n");
+  return ERROR_BIT | GENERAL_FAIL;
 }
 
 uint16_t Output_cmd(SYSREQ far *req)
 {
+  consolef("FN OUTPUT\n");
   req->io.count = 0;
-  return OP_COMPLETE;
+  return ERROR_BIT | WRITE_PROTECT;
 }
 
 uint16_t Output_verify_cmd(SYSREQ far *req)
 {
+  consolef("FN OUTPUT VERIFY\n");
   req->io.count = 0;
-  return OP_COMPLETE;
+  return ERROR_BIT | GENERAL_FAIL;
 }
 
 uint16_t Output_status_cmd(SYSREQ far *req)
@@ -188,7 +203,8 @@ uint16_t Ioctl_output_cmd(SYSREQ far *req)
 
 uint16_t Dev_open_cmd(SYSREQ far *req)
 {
-  return OP_COMPLETE;
+  consolef("FN DEV OPEN\n");
+  return ERROR_BIT | GENERAL_FAIL;
 }
 
 uint16_t Dev_close_cmd(SYSREQ far *req)
@@ -208,14 +224,16 @@ uint16_t Ioctl_cmd(SYSREQ far *req)
 
 uint16_t Get_l_d_map_cmd(SYSREQ far *req)
 {
+  consolef("FN GET LD MAP\n");
   req->ldmap.unit_code = 0;
-  return OP_COMPLETE;
+  return ERROR_BIT | GENERAL_FAIL;
 }
 
 uint16_t Set_l_d_map_cmd(SYSREQ far *req)
 {
+  consolef("FN SET LD MAP\n");
   req->ldmap.unit_code = 0;
-  return OP_COMPLETE;
+  return ERROR_BIT | GENERAL_FAIL;
 }
 
 uint16_t Unknown_cmd(SYSREQ far *req)

@@ -106,7 +106,7 @@ uint16_t Init_cmd(SYSREQ far *req)
       fn_bpb_table[idx].spt = 9;
       fn_bpb_table[idx].heads = 2;
       fn_bpb_table[idx].hidden = 0;
-      fn_bpb_table[idx].num_of_sectors_32 = 0;
+      fn_bpb_table[idx].num_sectors_32 = 0;
 
       fn_bpb_pointers[idx] = &fn_bpb_table[idx];
     }
