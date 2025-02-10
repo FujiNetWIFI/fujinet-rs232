@@ -174,9 +174,48 @@ uint16_t Input_flush_cmd(SYSREQ far *req)
 
 uint16_t Output_cmd(SYSREQ far *req)
 {
-  consolef("FN OUTPUT\n");
-  req->io.count = 0;
-  return ERROR_BIT | WRITE_PROTECT;
+  int reply;
+  uint16_t idx;
+  uint32_t sector;
+  uint8_t far *buf = req->io.buffer_ptr;
+
+
+  if (req->unit >= FN_MAX_DEV) {
+    consolef("Invalid Output unit: %i\n", req->unit);
+    return ERROR_BIT | UNKNOWN_UNIT;
+  }
+
+  // FIXME - is disk write protected?
+  
+  if (req->length > 22)
+    sector = req->io.start_sector_32;
+  else
+    sector = req->io.start_sector;
+
+#if 0
+  consolef("WRITE SECTOR: %i 0x%08lx %i\n", req->length, sector, req->io.count);
+#endif
+
+  for (idx = 0; idx < req->io.count; idx++, sector++) {
+    if (fn_bpb_table[req->unit].num_sectors && sector >= fn_bpb_table[req->unit].num_sectors
+	|| sector >= fn_bpb_table[req->unit].num_sectors_32) {
+      consolef("FN Invalid sector write %i on %i:\n", sector, req->unit);
+      return ERROR_BIT | NOT_FOUND;
+    }
+
+    cmd.device = DEVICEID_DISK + req->unit;
+    cmd.comnd = CMD_WRITE;
+    cmd.aux = sector;
+
+    reply = fujicom_command_write(&cmd, &buf[idx * SECTOR_SIZE], SECTOR_SIZE);
+    if (reply != 'C')
+      break;
+  }
+  if (!idx)
+    return ERROR_BIT | GENERAL_FAIL;
+
+  req->io.count = idx;
+  return OP_COMPLETE;
 }
 
 uint16_t Output_verify_cmd(SYSREQ far *req)
