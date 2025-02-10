@@ -44,6 +44,13 @@ typedef union {         /* Command Frame */
     uint8_t cksum;               /* 8-bit checksum */
   };
 } cmdFrame_t;
+
+typedef struct {
+  unsigned char hostSlot;
+  unsigned char mode;
+  char file[36];
+} deviceSlot_t;
+
 #pragma pack(pop)
 
 enum {
@@ -71,8 +78,14 @@ enum {
   CMD_APETIME_GETTIME           = 0x93,
   CMD_APETIME_SETTZ             = 0x99,
   CMD_APETIME_GETTZTIME         = 0x9A,
+  CMD_READ_DEVICE_SLOTS         = 0xF2,
   CMD_USERNAME                  = 0xFD,
   CMD_PASSWORD                  = 0xFE,
+};
+
+enum {
+  MODE_READONLY                 = 0,
+  MODE_READWRITE                = 1,
 };
 
 #define STATUS_MOUNT_TIME       0x01

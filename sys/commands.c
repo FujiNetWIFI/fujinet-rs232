@@ -15,13 +15,13 @@ extern void End_code(void);
 DOS_BPB fn_bpb_table[FN_MAX_DEV];
 DOS_BPB *fn_bpb_pointers[FN_MAX_DEV + 1]; // leave room for the NULL terminator
 
-static uint8_t sector_buf[SECTOR_SIZE];
 static cmdFrame_t cmd; // FIXME - make this shared with init.c?
-static DOS_BPB active_bpb[FN_MAX_DEV];
 
 // time_t on FujiNet is 64 bits but that is too large to work
 // with. Allocate twice as many 32b bit ints.
 static int32_t mount_status[FN_MAX_DEV * 2];
+
+static deviceSlot_t disk_slots[FN_MAX_DEV];
 
 uint16_t Media_check_cmd(SYSREQ far *req)
 {
@@ -39,8 +39,15 @@ uint16_t Media_check_cmd(SYSREQ far *req)
   cmd.device = DEVICEID_FUJINET;
   cmd.comnd = CMD_STATUS;
   cmd.aux = STATUS_MOUNT_TIME;
-
   reply = fujicom_command_read(&cmd, mount_status, sizeof(mount_status));
+  if (reply != 'C')
+    return ERROR_BIT | NOT_READY;
+
+  // Get read/write state while we're at it
+  cmd.device = DEVICEID_FUJINET;
+  cmd.comnd = CMD_READ_DEVICE_SLOTS;
+  cmd.aux = 0;
+  reply = fujicom_command_read(&cmd, disk_slots, sizeof(disk_slots));
   if (reply != 'C')
     return ERROR_BIT | NOT_READY;
 
@@ -81,9 +88,9 @@ uint16_t Build_bpb_cmd(SYSREQ far *req)
   cmd.comnd = CMD_READ;
   cmd.aux = 0;
 
-  // DOS gave us a buffer to use?
+  // DOS gave us a buffer to use
   buf = req->bpb.buffer_ptr;
-  reply = fujicom_command_read(&cmd, buf, sizeof(sector_buf));
+  reply = fujicom_command_read(&cmd, buf, SECTOR_SIZE);
   if (reply != 'C') {
     consolef("FujiNet read fail: %i\n", reply);
     return ERROR_BIT | READ_FAULT;
@@ -185,7 +192,8 @@ uint16_t Output_cmd(SYSREQ far *req)
     return ERROR_BIT | UNKNOWN_UNIT;
   }
 
-  // FIXME - is disk write protected?
+  if (disk_slots[req->unit].mode != MODE_READWRITE)
+    return ERROR_BIT | WRITE_PROTECT;
   
   if (req->length > 22)
     sector = req->io.start_sector_32;
