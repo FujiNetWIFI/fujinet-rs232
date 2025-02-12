@@ -8,7 +8,7 @@
 
 #undef DEBUG
 
-#define SECTOR_SIZE	512
+#define SECTOR_SIZE     512
 
 extern void End_code(void);
 
@@ -117,7 +117,7 @@ uint16_t Input_cmd(SYSREQ far *req)
 {
   int reply;
   uint16_t idx;
-  uint32_t sector;
+  uint32_t sector, sector_max;
   uint8_t far *buf = req->io.buffer_ptr;
 
 
@@ -129,7 +129,7 @@ uint16_t Input_cmd(SYSREQ far *req)
 #if 0
   dumpHex((uint8_t far *) req, req->length);
   consolef("SECTOR: %i 0x%04x 0x%08lx\n", req->length,
-	   req->io.start_sector, (uint32_t) req->io.start_sector_32);
+           req->io.start_sector, (uint32_t) req->io.start_sector_32);
 #endif
 
   if (req->length > 22)
@@ -137,14 +137,18 @@ uint16_t Input_cmd(SYSREQ far *req)
   else
     sector = req->io.start_sector;
 
+  if (fn_bpb_table[req->unit].num_sectors)
+    sector_max = fn_bpb_table[req->unit].num_sectors;
+  else
+    sector_max = fn_bpb_table[req->unit].num_sectors_32;
+
 #if 0
   consolef("SECTOR: %i 0x%08lx %i\n", req->length, sector, req->io.count);
 #endif
 
   for (idx = 0; idx < req->io.count; idx++, sector++) {
-    if (fn_bpb_table[req->unit].num_sectors && sector >= fn_bpb_table[req->unit].num_sectors
-	|| sector >= fn_bpb_table[req->unit].num_sectors_32) {
-      consolef("FN Invalid sector read %i on %i:\n", sector, req->unit);
+    if (sector >= sector_max) {
+      consolef("FN Invalid sector read %li on %i\n", sector, req->unit);
       return ERROR_BIT | NOT_FOUND;
     }
 
@@ -183,7 +187,7 @@ uint16_t Output_cmd(SYSREQ far *req)
 {
   int reply;
   uint16_t idx;
-  uint32_t sector;
+  uint32_t sector, sector_max;
   uint8_t far *buf = req->io.buffer_ptr;
 
 
@@ -194,19 +198,23 @@ uint16_t Output_cmd(SYSREQ far *req)
 
   if (disk_slots[req->unit].mode != MODE_READWRITE)
     return ERROR_BIT | WRITE_PROTECT;
-  
+
   if (req->length > 22)
     sector = req->io.start_sector_32;
   else
     sector = req->io.start_sector;
+
+  if (fn_bpb_table[req->unit].num_sectors)
+    sector_max = fn_bpb_table[req->unit].num_sectors;
+  else
+    sector_max = fn_bpb_table[req->unit].num_sectors_32;
 
 #if 0
   consolef("WRITE SECTOR: %i 0x%08lx %i\n", req->length, sector, req->io.count);
 #endif
 
   for (idx = 0; idx < req->io.count; idx++, sector++) {
-    if (fn_bpb_table[req->unit].num_sectors && sector >= fn_bpb_table[req->unit].num_sectors
-	|| sector >= fn_bpb_table[req->unit].num_sectors_32) {
+    if (sector >= sector_max) {
       consolef("FN Invalid sector write %i on %i:\n", sector, req->unit);
       return ERROR_BIT | NOT_FOUND;
     }
