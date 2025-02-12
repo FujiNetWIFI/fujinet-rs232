@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define DOS_SAFE
+#undef DOS_SAFE
 #ifdef DOS_SAFE
 /* Print a single character with DOS */
 extern void printChar(char);

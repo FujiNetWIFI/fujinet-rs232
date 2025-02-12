@@ -5,7 +5,7 @@
 void printHex(uint16_t val, uint16_t width, char leading)
 {
   uint16_t digits, tval;
-  const char hex_digits[] = "0123456789ABCDEF";
+  char c;
 
 
   for (tval = val, digits = 0; tval; tval >>= 4, digits++)
@@ -18,7 +18,8 @@ void printHex(uint16_t val, uint16_t width, char leading)
 
   while (digits) {
     digits--;
-    printChar(hex_digits[(val >> 4 * digits) & 0xf]);
+    c = (val >> 4 * digits) & 0xf;
+    printChar('0' + c + (c > 9 ? 7 : 0));
   }
 
   return;
@@ -28,7 +29,7 @@ void printHex32(uint32_t val, uint16_t width, char leading)
 {
   uint16_t digits;
   uint32_t tval;
-  const char hex_digits[] = "0123456789ABCDEF";
+  char c;
 
 
   for (tval = val, digits = 0; tval; tval >>= 4, digits++)
@@ -41,7 +42,8 @@ void printHex32(uint32_t val, uint16_t width, char leading)
 
   while (digits) {
     digits--;
-    printChar(hex_digits[(val >> 4 * digits) & 0xf]);
+    c = (val >> 4 * digits) & 0xf;
+    printChar('0' + c + (c > 9 ? 7 : 0));
   }
 
   return;
