@@ -36,6 +36,7 @@ enum {
 };
 
 extern void interrupt far (*old_int2f)();
+extern void far *sda_ptr;
 extern void interrupt far redirector(union INTPACK regs);
 
 // FIXME - these don't belong here

@@ -1,10 +1,13 @@
 #include "netredir.h"
+#include "dosdata.h"
 #include "fujicom.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <dos.h>
+#include "../sys/print.h"
 
 void interrupt far (*old_int2f)();
+void far *sda_ptr;
 
 typedef uint16_t(*redirectFunction_t)(void far *parms);
 
@@ -58,38 +61,6 @@ static redirectFunction_t dispatchTable[] = {
   NULL,		// 0x2E extended open file
 };
 
-/* Print a single character with BIOS */
-extern void printChar(char);
-#pragma aux printChar =         \
-  "mov ah, 0xE"                 \
-  "int 0x10"                    \
-  __parm [__al]                 \
-  __modify [__ax __cx];
-
-static inline void printHex32(uint32_t val, uint16_t width, char leading)
-{
-  uint16_t digits;
-  uint32_t tval;
-  char c;
-
-
-  for (tval = val, digits = 0; tval; tval >>= 4, digits++)
-    ;
-  if (!digits)
-    digits = 1;
-
-  for (; digits < width; width--)
-    printChar(leading);
-
-  while (digits) {
-    digits--;
-    c = (val >> 4 * digits) & 0xf;
-    printChar('0' + c + (c > 9 ? 7 : 0));
-  }
-
-  return;
-}
-
 void interrupt far redirector(union INTPACK regs)
 {
   uint8_t func, subfunc;
@@ -98,6 +69,7 @@ void interrupt far redirector(union INTPACK regs)
   func = regs.h.ah;
   subfunc = regs.h.al;
 
+#if 0
   printChar('F');
   printHex32(getCS(), 4, '0');
   printChar('-');
@@ -106,15 +78,30 @@ void interrupt far redirector(union INTPACK regs)
   printHex32(regs.x.ax, 4, '0');
   printChar('.');
   //consolef("AX: %04x\n", regs.x.ax);
+#endif
   
   if (func != REDIRECTOR_FUNC) { // Not our redirector call, pass it down the chain
     _chain_intr(old_int2f);
     return; // Should never reach here
   }
+#if 0
   printChar('N');
+#endif
 
   // FIXME - check if drive is us
-  //consolef("FN REDIRECT SUB 0x%02x\n", subfunc);
+  consolef("FN REDIRECT SUB 0x%02x ES: 0x%04x DI: 0x%04x\n", subfunc, regs.x.es, regs.x.di);
+
+#if 0
+  {
+    uint8_t far *str = ((V4_SDA_PTR) sda_ptr)->cdsptr;
+
+
+    for (; str && *str; str++)
+      printChar(*str);
+  }
+  consolef("\n");
+#endif
+
   _chain_intr(old_int2f);
 
   return;
