@@ -57,8 +57,10 @@ errcode fuji_open_url(const char *url)
     printf("FN STATUS REPLY: 0x%02x\n", reply);
   // FIXME - check err
 
+#if 0
   printf("FN STATUS: len %i  con %i  err %i\n",
 	 status.length, status.connected, status.errcode);
+#endif
   if (status.errcode > NETWORK_SUCCESS && !status.length)
     return status.errcode;
 #if 0
@@ -163,17 +165,26 @@ FN_DIRENT *fuji_readdir()
   }
 
   memset(&ent, 0, sizeof(ent));
+
+  // get filename
   cptr1 = strtok(&fuji_buf[cur_dir.position], DIR_DELIM);
+  ent.name = cptr1;
 
   // get extension
   cptr2 = strtok(NULL, DIR_DELIM);
-  v1 = strlen(cptr1);
-  cptr1[v1] = '.';
-  memmove(&cptr1[v1 + 1], cptr2, strlen(cptr2) + 1);
-  ent.name = cptr1;
+  if (cptr2 - cptr1 < 10) {
+    v1 = strlen(cptr1);
+    cptr1[v1] = '.';
+    memmove(&cptr1[v1 + 1], cptr2, strlen(cptr2) + 1);
 
-  // get size or dir
-  cptr1 = strtok(NULL, DIR_DELIM);
+    // get size or dir
+    cptr1 = strtok(NULL, DIR_DELIM);
+  }
+  else {
+    // extension is too far away, it must be the size
+    cptr1 = cptr2;
+  }
+
   if (strcasecmp(cptr1, "<DIR>") == 0)
     ent.isdir = 1;
   else
@@ -200,8 +211,7 @@ FN_DIRENT *fuji_readdir()
   ftm.tm_hour = atoi(cptr3);
   cptr3 = strtok(NULL, " ");
   ftm.tm_min = atoi(cptr3);
-  if (tolower(cptr3[2]) == 'p')
-    ftm.tm_hour = (ftm.tm_hour + 12) % 24;
+  ftm.tm_hour = ftm.tm_hour % 12 + (tolower(cptr3[2]) == 'p' ? 12 : 0);
 
   ent.mtime = mktime(&ftm);
 
