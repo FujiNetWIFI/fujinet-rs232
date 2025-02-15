@@ -18,7 +18,7 @@ typedef struct {
 } FN_DIRENT;
 
 // FIXME - this should probably return a handle to point to the network device which was used?
-extern errcode fuji_open_url(const char *url);
+extern errcode fuji_open_url(const char *url, const char *user, const char *password);
 extern errcode fuji_close_url();
 extern size_t fuji_read(uint8_t *buf, size_t length);
 extern errcode fuji_opendir();
