@@ -155,7 +155,7 @@ FN_DIRENT *fuji_readdir()
   int v1, v2, v3;
 
 
-  // make sure there's an END-OF-RECORD, if not refill buffer
+  // Refill buffer if it's empty
   if (cur_dir.position >= cur_dir.length) {
     cur_dir.length = fuji_read(fuji_buf, sizeof(fuji_buf));
     cur_dir.position = 0;
@@ -167,14 +167,15 @@ FN_DIRENT *fuji_readdir()
        idx++)
     ;
   cur_dir.position = idx;
+
+  // make sure there's an END-OF-RECORD, if not refill buffer
   for (; idx < cur_dir.length && fuji_buf[idx] != '\r' && fuji_buf[idx] != '\n';
        idx++)
     ;
   if (idx == cur_dir.length) {
-    //return NULL;
     v1 = cur_dir.length - cur_dir.position;
     memmove(fuji_buf, &fuji_buf[cur_dir.position], v1);
-    v2 = fuji_read(fuji_buf, sizeof(fuji_buf) - v1);
+    v2 = fuji_read(&fuji_buf[v1], sizeof(fuji_buf) - v1);
     if (!v2)
       return NULL;
     cur_dir.position = 0;

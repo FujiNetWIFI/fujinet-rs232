@@ -96,7 +96,7 @@ void printDec32(uint32_t val, uint16_t width, char leading)
   return;
 }
 
-void dumpHex(void far *ptr, uint16_t count)
+void dumpHex(void far *ptr, uint16_t count, uint16_t address)
 {
   int outer, inner;
   uint8_t c, is_err;
@@ -104,7 +104,7 @@ void dumpHex(void far *ptr, uint16_t count)
 
 
   for (outer = 0; outer < count; outer += 16) {
-    printHex(outer, 4, '0');
+    printHex(outer + address, 4, '0');
 #ifdef DOS_SAFE
     printDTerm("  $");
 #else

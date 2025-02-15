@@ -12,6 +12,9 @@
 
 //#include "../sys/print.h" // debug
 
+#define COL_NAME	14
+#define COL_SIZE	9
+
 char buf[256];
 
 void print_dir();
@@ -112,9 +115,9 @@ void print_dir()
     tm_p = localtime(&ent->mtime);
     strftime(buf, sizeof(buf) - 1, "%Y-%b-%d %H:%M", tm_p);
     if (ent->isdir)
-      printf("%-14s  <DIR>  %s\n", ent->name, buf);
+      printf("%-*s %-*s %s\n", COL_NAME, ent->name, COL_SIZE, "<DIR>", buf);
     else
-      printf("%-14s %7li %s\n", ent->name, ent->size, buf);
+      printf("%-*s %*lu %s\n", COL_NAME, ent->name, COL_SIZE, ent->size, buf);
   }
 #else
   for (;;) {
