@@ -44,25 +44,36 @@ errcode fuji_open_url(const char *url, const char *user, const char *password)
   int reply;
 
 
-  // FIXME - Does user/pass need to be nullified because they stick from a previous open?
-  if (user) {
+  // User/pass is "sticky" and needs to be set/reset on open
+  memset(fuji_buf, 0, sizeof(fuji_buf));
+  if (user)
     strcpy(fuji_buf, user);
-    reply = fujiF5_write(NETDEV, CMD_USERNAME, 0, 0, &fuji_buf, OPEN_SIZE);
-    // FIXME - check err
-    if (password) {
-      strcpy(fuji_buf, password);
-      reply = fujiF5_write(NETDEV, CMD_PASSWORD, 0, 0, &fuji_buf, OPEN_SIZE);
-      // FIXME - check err
-    }
-  }
+  reply = fujiF5_write(NETDEV, CMD_USERNAME, 0, 0, &fuji_buf, OPEN_SIZE);
+  // FIXME - check err
+  memset(fuji_buf, 0, sizeof(fuji_buf));
+  if (password)
+    strcpy(fuji_buf, password);
+  reply = fujiF5_write(NETDEV, CMD_PASSWORD, 0, 0, &fuji_buf, OPEN_SIZE);
+  // FIXME - check err
   
-  ennify(url);
-  reply = fujiF5_write(NETDEV, CMD_OPEN, 0x0006, 0, &fuji_buf, OPEN_SIZE);
+  return fuji_open(url, FUJI_DIRECTORY);
+}
+
+errcode fuji_close_url()
+{
+  return fuji_close();
+}
+
+errcode fuji_open(const char *path, uint16_t mode)
+{
+  int reply;
+
+
+  ennify(path);
+  reply = fujiF5_write(NETDEV, CMD_OPEN, mode, 0, &fuji_buf, OPEN_SIZE);
   if (reply != REPLY_COMPLETE)
     printf("FN OPEN REPLY: 0x%02x\n", reply);
   // FIXME - check err
-
-  delay(10); // FIXME - is this needed?
 
   reply = fujiF5_read(NETDEV, CMD_STATUS, 0, 0, &status, sizeof(status));
   if (reply != REPLY_COMPLETE)
@@ -84,7 +95,8 @@ errcode fuji_open_url(const char *url, const char *user, const char *password)
   return 0;
 }
 
-errcode fuji_close_url()
+
+errcode fuji_close()
 {
   fujiF5_none(NETDEV, CMD_CLOSE, 0, 0, NULL, 0);
   return 0;
@@ -121,18 +133,11 @@ size_t fuji_read(uint8_t *buf, size_t length)
 
 errcode fuji_opendir()
 {
-  int reply;
+  errcode err;
 
-
-  strcpy(fuji_buf, "N:");
-  reply = fujiF5_write(NETDEV, CMD_OPEN, 0x0006, 0, &fuji_buf, OPEN_SIZE);
-  if (reply != REPLY_COMPLETE)
-    printf("FN OPEN REPLY: 0x%02x\n", reply);
-  // FIXME - check err
 
   cur_dir.position = cur_dir.length = 0;
-  
-  return 0;
+  return fuji_open("", FUJI_DIRECTORY);
 }
 
 errcode fuji_closedir()
