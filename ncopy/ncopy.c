@@ -61,7 +61,7 @@ void main(int argc, char *argv[])
       break;
 
     case CMD_CD:
-      printf("change the directory\n");
+      fuji_chdir(cmd.args[1]);
       break;
 
     case CMD_EXIT:
@@ -82,6 +82,7 @@ void print_dir()
   errcode err;
   size_t len;
   FN_DIRENT *ent;
+  struct tm *tm_p;
 
 
   err = fuji_opendir();
@@ -90,19 +91,21 @@ void print_dir()
     return;
   }
 
-  printf("Reading dir\n");
-
 #if 1
   while ((ent = fuji_readdir())) {
-    printf("%s %li\n", ent->name, ent->size);
+    tm_p = localtime(&ent->mtime);
+    strftime(buf, sizeof(buf) - 1, "%Y-%b-%d %H:%M", tm_p);
+    if (ent->isdir)
+      printf("%-14s  <DIR>  %s\n", ent->name, buf);
+    else
+      printf("%-14s %7li %s\n", ent->name, ent->size, buf);
   }
 #else
   for (;;) {
     len = fuji_read(buf, sizeof(buf));
-    printf("DIR READ: %\n", len);
     if (!len)
       break;
-    printf("%.*s", sizeof(buf), buf);
+    printf("%.*s", len, buf);
   }
 #endif
   printf("\n");

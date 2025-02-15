@@ -13,7 +13,7 @@ typedef int errcode;
 typedef struct {
   const char *name;
   off_t size;
-  time_t mtime;
+  time_t ctime, mtime;
   unsigned char isdir:1;
 } FN_DIRENT;
 
