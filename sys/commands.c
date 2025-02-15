@@ -196,7 +196,7 @@ uint16_t Output_cmd(SYSREQ far *req)
     return ERROR_BIT | UNKNOWN_UNIT;
   }
 
-  if (disk_slots[req->unit].mode != MODE_READWRITE)
+  if (disk_slots[req->unit].mode != SLOT_READWRITE)
     return ERROR_BIT | WRITE_PROTECT;
 
   if (req->length > 22)

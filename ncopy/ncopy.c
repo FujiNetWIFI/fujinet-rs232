@@ -8,12 +8,14 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <conio.h>
+#include <string.h>
 
 //#include "../sys/print.h" // debug
 
 char buf[256];
 
 void print_dir();
+void get_file(const char *source, const char *dest);
 void get_password(char *password, size_t max_len);
 
 void main(int argc, char *argv[])
@@ -34,6 +36,8 @@ void main(int argc, char *argv[])
     // Maybe authentication is needed?
     printf("User: ");
     fgets(buf, 128, stdin);
+    if (buf[0])
+      buf[strlen(buf) - 1] = 0;
     printf("Password: ");
     fflush(stdout);
     get_password(&buf[128], 128);
@@ -65,7 +69,7 @@ void main(int argc, char *argv[])
       break;
 
     case CMD_GET:
-      printf("get the file\n");
+      get_file(cmd.args[1], cmd.args[2]);
       break;
 
     case CMD_PUT:
@@ -124,6 +128,47 @@ void print_dir()
 
   fuji_closedir();
 
+  return;
+}
+
+void get_file(const char *source, const char *dest)
+{
+  FILE *file;
+  errcode err;
+  size_t len, lenw;
+  off_t total;
+
+
+  if (!dest)
+    dest = source;
+  file = fopen(dest, "wb");
+  if (!file) {
+    printf("Failed to open local file: %s\n", dest);
+    return;
+  }
+
+  err = fuji_open(source, FUJI_READ);
+  if (err) {
+    printf("Failed to open remote file: %s\n", source);
+    fclose(file);
+    return;
+  }
+
+  total = 0;
+  while ((len = fuji_read(buf, sizeof(buf)))) {
+    total += len;
+    lenw = fwrite(buf, 1, len, file);
+    printf("%10lu bytes transferred.\r", total);
+    
+    if (lenw != len) {
+      printf("Failed to write\n");
+      break;
+    }
+  }
+  printf("\n");
+
+  fuji_close();
+  fclose(file);
   return;
 }
 

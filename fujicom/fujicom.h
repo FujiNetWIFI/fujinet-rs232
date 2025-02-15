@@ -85,8 +85,8 @@ enum {
 };
 
 enum {
-  MODE_READONLY                 = 1,
-  MODE_READWRITE                = 2,
+  SLOT_READONLY                 = 1,
+  SLOT_READWRITE                = 2,
 };
 
 enum {
