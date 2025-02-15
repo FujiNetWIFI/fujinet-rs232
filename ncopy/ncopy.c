@@ -7,12 +7,14 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <conio.h>
 
 //#include "../sys/print.h" // debug
 
 char buf[256];
 
 void print_dir();
+void get_password(char *password, size_t max_len);
 
 void main(int argc, char *argv[])
 {
@@ -27,10 +29,20 @@ void main(int argc, char *argv[])
     exit(1);
   }
   
-  err = fuji_open_url(url);
+  err = fuji_open_url(url, NULL, NULL);
   if (err) {
-    printf("Err: %i unable to open URL: %s\n", err, url);
-    exit(1);
+    // Maybe authentication is needed?
+    printf("User: ");
+    fgets(buf, 128, stdin);
+    printf("Password: ");
+    fflush(stdout);
+    get_password(&buf[128], 128);
+
+    err = fuji_open_url(url, buf, &buf[128]);
+    if (err) {
+      printf("Err: %i unable to open URL: %s\n", err, url);
+      exit(1);
+    }
   }
 
   // Opened succesfully, we don't need it anymore
@@ -112,5 +124,38 @@ void print_dir()
 
   fuji_closedir();
 
+  return;
+}
+
+void get_password(char *password, size_t max_len)
+{
+  size_t idx = 0;
+  char ch;
+
+
+  while (idx < max_len - 1) {
+    ch = getch();
+
+    if (ch == '\r' || ch == '\n')
+      break;
+
+    // Handle backspace/delete
+    if (ch == '\b' || ch == 127) {
+      if (idx) {
+	// Erase '*' from the screen
+        printf("\b \b");
+	fflush(stdout);
+        idx--;
+      }
+    }
+    else {
+      password[idx++] = ch;
+      printf("*");
+      fflush(stdout);
+    }
+  }
+
+  password[idx] = 0;
+  printf("\n");
   return;
 }

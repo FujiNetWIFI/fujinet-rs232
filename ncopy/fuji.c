@@ -39,11 +39,23 @@ void ennify(const char *path)
   return;
 }
   
-errcode fuji_open_url(const char *url)
+errcode fuji_open_url(const char *url, const char *user, const char *password)
 {
   int reply;
 
 
+  // FIXME - Does user/pass need to be nullified because they stick from a previous open?
+  if (user) {
+    strcpy(fuji_buf, user);
+    reply = fujiF5_write(NETDEV, CMD_USERNAME, 0, 0, &fuji_buf, OPEN_SIZE);
+    // FIXME - check err
+    if (password) {
+      strcpy(fuji_buf, password);
+      reply = fujiF5_write(NETDEV, CMD_PASSWORD, 0, 0, &fuji_buf, OPEN_SIZE);
+      // FIXME - check err
+    }
+  }
+  
   ennify(url);
   reply = fujiF5_write(NETDEV, CMD_OPEN, 0x0006, 0, &fuji_buf, OPEN_SIZE);
   if (reply != REPLY_COMPLETE)
