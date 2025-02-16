@@ -19,6 +19,7 @@ char buf[256];
 
 void print_dir();
 void get_file(const char *source, const char *dest);
+void put_file(const char *source, const char *dest);
 void get_password(char *password, size_t max_len);
 
 void main(int argc, char *argv[])
@@ -76,7 +77,7 @@ void main(int argc, char *argv[])
       break;
 
     case CMD_PUT:
-      printf("put the file\n");
+      put_file(cmd.args[1], cmd.args[2]);
       break;
 
     case CMD_CD:
@@ -161,6 +162,47 @@ void get_file(const char *source, const char *dest)
   while ((len = fuji_read(buf, sizeof(buf)))) {
     total += len;
     lenw = fwrite(buf, 1, len, file);
+    printf("%10lu bytes transferred.\r", total);
+    
+    if (lenw != len) {
+      printf("Failed to write\n");
+      break;
+    }
+  }
+  printf("\n");
+
+  fuji_close();
+  fclose(file);
+  return;
+}
+
+void put_file(const char *source, const char *dest)
+{
+  FILE *file;
+  errcode err;
+  size_t len, lenw;
+  off_t total;
+
+
+  if (!dest)
+    dest = source;
+  file = fopen(source, "rb");
+  if (!file) {
+    printf("Failed to open local file: %s\n", source);
+    return;
+  }
+
+  err = fuji_open(dest, FUJI_WRITE);
+  if (err) {
+    printf("Failed to open remote file: %s\n", dest);
+    fclose(file);
+    return;
+  }
+
+  total = 0;
+  while ((len = fread(buf, 1, sizeof(buf), file))) {
+    lenw = fuji_write(buf, len);
+    total += lenw;
     printf("%10lu bytes transferred.\r", total);
     
     if (lenw != len) {

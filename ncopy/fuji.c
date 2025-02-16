@@ -84,6 +84,10 @@ errcode fuji_open(const char *path, uint16_t mode)
   printf("FN STATUS: len %i  con %i  err %i\n",
 	 status.length, status.connected, status.errcode);
 #endif
+  // FIXME - apparently the error returned when opening in write mode should be ignored?
+  if (mode == FUJI_WRITE)
+    return 0;
+
   if (status.errcode > NETWORK_SUCCESS && !status.length)
     return status.errcode;
 #if 0
@@ -126,6 +130,18 @@ size_t fuji_read(uint8_t *buf, size_t length)
     length = status.length;
 
   reply = fujiF5_read(DEVICEID_FN_NETWORK, CMD_READ, length, 0, buf, length);
+  if (reply != REPLY_COMPLETE)
+    return 0;
+  return length;
+}
+
+// Returns number of bytes written
+size_t fuji_write(uint8_t *buf, size_t length)
+{
+  int reply;
+
+
+  reply = fujiF5_write(DEVICEID_FN_NETWORK, CMD_WRITE, length, 0, buf, length);
   if (reply != REPLY_COMPLETE)
     return 0;
   return length;
