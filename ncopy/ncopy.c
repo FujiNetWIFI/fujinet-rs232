@@ -217,6 +217,47 @@ void put_file(const char *source, const char *dest)
   return;
 }
 
+void put_file(const char *source, const char *dest)
+{
+  FILE *file;
+  errcode err;
+  size_t len, lenw;
+  off_t total;
+
+
+  if (!dest)
+    dest = source;
+  file = fopen(source, "rb");
+  if (!file) {
+    printf("Failed to open local file: %s\n", source);
+    return;
+  }
+
+  err = fuji_open(dest, FUJI_WRITE);
+  if (err) {
+    printf("Failed to open remote file: %s\n", dest);
+    fclose(file);
+    return;
+  }
+
+  total = 0;
+  while ((len = fread(buf, 1, sizeof(buf), file))) {
+    lenw = fuji_write(buf, len);
+    total += lenw;
+    printf("%10lu bytes transferred.\r", total);
+    
+    if (lenw != len) {
+      printf("Failed to write\n");
+      break;
+    }
+  }
+  printf("\n");
+
+  fuji_close();
+  fclose(file);
+  return;
+}
+
 void get_password(char *password, size_t max_len)
 {
   size_t idx = 0;

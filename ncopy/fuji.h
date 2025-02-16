@@ -29,6 +29,7 @@ extern errcode fuji_close_url();
 extern errcode fuji_open(const char *path, uint16_t mode);
 extern errcode fuji_close();
 extern size_t fuji_read(uint8_t *buf, size_t length);
+extern size_t fuji_write(uint8_t *buf, size_t length);
 extern errcode fuji_opendir();
 extern errcode fuji_closedir();
 extern FN_DIRENT *fuji_readdir();
