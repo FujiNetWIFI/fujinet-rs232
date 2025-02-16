@@ -1,7 +1,7 @@
 /* Contributed by fozztexx@fozztexx.com
  */
 
-#include "fuji.h"
+#include "fujifs.h"
 #include "fujicom.h"
 #include <string.h>
 #include <strings.h>
@@ -25,52 +25,52 @@ typedef struct {
   size_t position, length;
 } FN_DIR;
   
-static uint8_t fuji_buf[256];
+static uint8_t fujifs_buf[256];
 static FN_DIR cur_dir;
 static struct tm ftm;
 
-// Copy path to fuji_buf and make sure it has N: prefix
+// Copy path to fujifs_buf and make sure it has N: prefix
 void ennify(const char *path)
 {
-  fuji_buf[0] = 0;
+  fujifs_buf[0] = 0;
   if (toupper(path[0]) != 'N' || path[1] != ':')
-    strcat(fuji_buf, "N:");
-  strncat(fuji_buf, path, OPEN_SIZE - 1 - strlen(fuji_buf));
+    strcat(fujifs_buf, "N:");
+  strncat(fujifs_buf, path, OPEN_SIZE - 1 - strlen(fujifs_buf));
   return;
 }
   
-errcode fuji_open_url(const char *url, const char *user, const char *password)
+errcode fujifs_open_url(const char *url, const char *user, const char *password)
 {
   int reply;
 
 
   // User/pass is "sticky" and needs to be set/reset on open
-  memset(fuji_buf, 0, sizeof(fuji_buf));
+  memset(fujifs_buf, 0, sizeof(fujifs_buf));
   if (user)
-    strcpy(fuji_buf, user);
-  reply = fujiF5_write(NETDEV, CMD_USERNAME, 0, 0, &fuji_buf, OPEN_SIZE);
+    strcpy(fujifs_buf, user);
+  reply = fujiF5_write(NETDEV, CMD_USERNAME, 0, 0, &fujifs_buf, OPEN_SIZE);
   // FIXME - check err
-  memset(fuji_buf, 0, sizeof(fuji_buf));
+  memset(fujifs_buf, 0, sizeof(fujifs_buf));
   if (password)
-    strcpy(fuji_buf, password);
-  reply = fujiF5_write(NETDEV, CMD_PASSWORD, 0, 0, &fuji_buf, OPEN_SIZE);
+    strcpy(fujifs_buf, password);
+  reply = fujiF5_write(NETDEV, CMD_PASSWORD, 0, 0, &fujifs_buf, OPEN_SIZE);
   // FIXME - check err
   
-  return fuji_open(url, FUJI_DIRECTORY);
+  return fujifs_open(url, FUJIFS_DIRECTORY);
 }
 
-errcode fuji_close_url()
+errcode fujifs_close_url()
 {
-  return fuji_close();
+  return fujifs_close();
 }
 
-errcode fuji_open(const char *path, uint16_t mode)
+errcode fujifs_open(const char *path, uint16_t mode)
 {
   int reply;
 
 
   ennify(path);
-  reply = fujiF5_write(NETDEV, CMD_OPEN, mode, 0, &fuji_buf, OPEN_SIZE);
+  reply = fujiF5_write(NETDEV, CMD_OPEN, mode, 0, &fujifs_buf, OPEN_SIZE);
   if (reply != REPLY_COMPLETE)
     printf("FN OPEN REPLY: 0x%02x\n", reply);
   // FIXME - check err
@@ -85,7 +85,7 @@ errcode fuji_open(const char *path, uint16_t mode)
 	 status.length, status.connected, status.errcode);
 #endif
   // FIXME - apparently the error returned when opening in write mode should be ignored?
-  if (mode == FUJI_WRITE)
+  if (mode == FUJIFS_WRITE)
     return 0;
 
   if (status.errcode > NETWORK_SUCCESS && !status.length)
@@ -100,14 +100,14 @@ errcode fuji_open(const char *path, uint16_t mode)
 }
 
 
-errcode fuji_close()
+errcode fujifs_close()
 {
   fujiF5_none(NETDEV, CMD_CLOSE, 0, 0, NULL, 0);
   return 0;
 }
 
 // Returns number of bytes read
-size_t fuji_read(uint8_t *buf, size_t length)
+size_t fujifs_read(uint8_t *buf, size_t length)
 {
   int reply;
 
@@ -136,7 +136,7 @@ size_t fuji_read(uint8_t *buf, size_t length)
 }
 
 // Returns number of bytes written
-size_t fuji_write(uint8_t *buf, size_t length)
+size_t fujifs_write(uint8_t *buf, size_t length)
 {
   int reply;
 
@@ -147,22 +147,22 @@ size_t fuji_write(uint8_t *buf, size_t length)
   return length;
 }
 
-errcode fuji_opendir()
+errcode fujifs_opendir()
 {
   errcode err;
 
 
   cur_dir.position = cur_dir.length = 0;
-  return fuji_open("", FUJI_DIRECTORY);
+  return fujifs_open("", FUJIFS_DIRECTORY);
 }
 
-errcode fuji_closedir()
+errcode fujifs_closedir()
 {
   fujiF5_none(NETDEV, CMD_CLOSE, 0, 0, NULL, 0);
   return 0;
 }
 
-FN_DIRENT *fuji_readdir()
+FN_DIRENT *fujifs_readdir()
 {
   size_t len;
   static FN_DIRENT ent;
@@ -173,25 +173,25 @@ FN_DIRENT *fuji_readdir()
 
   // Refill buffer if it's empty
   if (cur_dir.position >= cur_dir.length) {
-    cur_dir.length = fuji_read(fuji_buf, sizeof(fuji_buf));
+    cur_dir.length = fujifs_read(fujifs_buf, sizeof(fujifs_buf));
     cur_dir.position = 0;
   }
 
   for (idx = cur_dir.position;
        idx < cur_dir.length &&
-	 (fuji_buf[idx] == ' ' || fuji_buf[idx] == '\r' || fuji_buf[idx] == '\n');
+	 (fujifs_buf[idx] == ' ' || fujifs_buf[idx] == '\r' || fujifs_buf[idx] == '\n');
        idx++)
     ;
   cur_dir.position = idx;
 
   // make sure there's an END-OF-RECORD, if not refill buffer
-  for (; idx < cur_dir.length && fuji_buf[idx] != '\r' && fuji_buf[idx] != '\n';
+  for (; idx < cur_dir.length && fujifs_buf[idx] != '\r' && fujifs_buf[idx] != '\n';
        idx++)
     ;
   if (idx == cur_dir.length) {
     v1 = cur_dir.length - cur_dir.position;
-    memmove(fuji_buf, &fuji_buf[cur_dir.position], v1);
-    v2 = fuji_read(&fuji_buf[v1], sizeof(fuji_buf) - v1);
+    memmove(fujifs_buf, &fujifs_buf[cur_dir.position], v1);
+    v2 = fujifs_read(&fujifs_buf[v1], sizeof(fujifs_buf) - v1);
     if (!v2)
       return NULL;
     cur_dir.position = 0;
@@ -201,7 +201,7 @@ FN_DIRENT *fuji_readdir()
   memset(&ent, 0, sizeof(ent));
 
   // get filename
-  cptr1 = strtok(&fuji_buf[cur_dir.position], DIR_DELIM);
+  cptr1 = strtok(&fujifs_buf[cur_dir.position], DIR_DELIM);
   ent.name = cptr1;
 
   // get extension
@@ -249,19 +249,19 @@ FN_DIRENT *fuji_readdir()
 
   ent.mtime = mktime(&ftm);
 
-  v1 = (cptr3 - fuji_buf) + 4;
+  v1 = (cptr3 - fujifs_buf) + 4;
   cur_dir.position = v1;
 
   return &ent;
 }
 
-errcode fuji_chdir(const char *path)
+errcode fujifs_chdir(const char *path)
 {
   int reply;
 
 
   ennify(path);
-  reply = fujiF5_write(NETDEV, CMD_CHDIR, 0x0000, 0, &fuji_buf, OPEN_SIZE);
+  reply = fujiF5_write(NETDEV, CMD_CHDIR, 0x0000, 0, &fujifs_buf, OPEN_SIZE);
   if (reply != REPLY_COMPLETE)
     printf("FN OPEN REPLY: 0x%02x\n", reply);
   // FIXME - check err
