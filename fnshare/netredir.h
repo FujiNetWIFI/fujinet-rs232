@@ -1,6 +1,9 @@
 #ifndef _NETREDIR_H
 #define _NETREDIR_H
 
+#include "dosdata.h"
+#include <stdint.h>
+
 #define DOS_INT_REDIR	0x2F
 #define REDIRECTOR_FUNC	0x11
 
@@ -37,7 +40,11 @@ enum {
 
 extern void interrupt far (*old_int2f)();
 extern void far *sda_ptr;
+extern uint8_t drive_num;
+
 extern void interrupt far redirector(union INTPACK regs);
+extern int findfirst(const char far *path, SRCHREC_PTR data);
+extern int findnext(SRCHREC_PTR data);
 
 // FIXME - these don't belong here
 extern __segment getCS(void);

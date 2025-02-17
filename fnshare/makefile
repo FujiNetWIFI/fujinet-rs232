@@ -16,7 +16,7 @@ $(TARGET): $(OBJS)
 	$(LD) $(LDFLAGS) &
 	  disable 1014 &
 	  name $@ &
-	  file {$(OBJS) ../sys/print.obj} &
+	  file {$(OBJS) ../sys/print.obj ../ncopy/fujifs.obj} &
 	  library {fujicoms.lib clibs.lib}
 
 fnshare.obj: fnshare.c .AUTODEPEND

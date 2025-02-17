@@ -25,7 +25,7 @@ void get_password(char *password, size_t max_len);
 void main(int argc, char *argv[])
 {
   char *url = argv[1];
-  int err;
+  errcode err;
   parsed cmd;
   int done = 0;
 

@@ -285,6 +285,7 @@ void fujicom_done(void)
 int fujiF5(uint8_t direction, uint8_t device, uint8_t command,
 	   uint16_t aux12, uint16_t aux34, void far *buffer, uint16_t length)
 {
+  int result;
   f5regs.x.dx = direction;
   f5regs.h.al = device;
   f5regs.h.ah = command;
