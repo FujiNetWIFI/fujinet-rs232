@@ -17,13 +17,16 @@ INTERRUPT MACRO func
 	push	es
 	push	ax
 	push	ax
+	mov	bp,sp
 
 ; Set up data segment
 	push	cs
 	pop	ds
 
 	call	func
+	mov	ss:[bp+22],ax	; Put return value on stack
 
+	mov	sp,bp
 	pop	ax
 	pop	ax
 	pop	es
