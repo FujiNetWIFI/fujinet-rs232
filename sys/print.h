@@ -35,6 +35,8 @@ extern void printHex(uint16_t val, uint16_t width, char leading);
 extern void printHex32(uint32_t val, uint16_t width, char leading);
 extern void printDec(uint16_t val, uint16_t width, char leading);
 extern void dumpHex(void far *ptr, uint16_t count, uint16_t address);
+extern void printString(const char *str);
+extern void printFarString(const char far *str);
 
 extern void consolef(const char *format, ...);
 

@@ -8,6 +8,11 @@
 #include <dos.h>
 #include "../sys/print.h"
 
+/* Get value of field from [S]wappable [D]OS [A]rea */
+#define DOS_SDA_VALUE(x) DOS_STRUCT_VALUE(SDA_PTR, sda_ptr, x)
+/* Get pointer to field */
+#define DOS_SDA_POINTER(x) DOS_STRUCT_POINTER(SDA_PTR, sda_ptr, x)
+
 void interrupt far (*old_int2f)();
 void far *sda_ptr;
 uint8_t drive_num;
@@ -70,16 +75,25 @@ static redirectFunction_t dispatchTable[] = {
 void set_intr_retval(uint16_t);
 #pragma aux set_intr_retval = \
   "mov ss:[bp+22],ax" \
+  "test ax,ax"	      \
+  "jnz set_carry"     \
+  "clc"		      \
+  "jmp done"	      \
+  "set_carry: stc"    \
+  "done:"	      \
   parm [ax]
 
 void interrupt far redirector(union INTPACK regs)
 {
   uint8_t func, subfunc;
   char far *path;
+  uint16_t result;
 
 
   func = regs.h.ah;
   subfunc = regs.h.al;
+  //  consolef("FN REDIR 0x%02x/%02x\n", func, subfunc);
+  //consolef("");
 
   if (func != REDIRECTOR_FUNC) { // Not our redirector call, pass it down the chain
     _chain_intr(old_int2f);
@@ -94,42 +108,59 @@ void interrupt far redirector(union INTPACK regs)
   // FIXME - check if drive is us
 
   // Check if path is us
-  path = ((V4_SDA_PTR) sda_ptr)->cdsptr; // FIXME - check DOS version
+  path = DOS_SDA_VALUE(cdsptr);
   if (_fstrncmp(path, "FujiNet ", 8) != 0)
     goto not_us;
 
   switch (subfunc) {
   case SUBF_FINDFIRST:
-    set_intr_retval(findfirst(path, &((V4_SDA_PTR) sda_ptr)->srchrec));
-    return;
+    result = findfirst(path, DOS_SDA_POINTER(srchrec));
+    break;
 
   case SUBF_FINDNEXT:
-    set_intr_retval(findnext(&((V4_SDA_PTR) sda_ptr)->srchrec));
-    return;
+    result = findnext(DOS_SDA_POINTER(srchrec));
+    break;
 
   default:
     consolef("FN REDIRECT SUB 0x%02x ES: 0x%04x DI: 0x%04x\n", subfunc, regs.x.es, regs.x.di);
-#if 1
-    {
-      uint8_t far *str = path;
-
-
-      for (; str && *str; str++)
-        printChar(*str);
-    }
-    printChar('\n');
-#endif
+    result = 0x16;
     break;
   }
+
+  consolef("RESULT: 0x%04x\n", result);
+  set_intr_retval(result);
+  return;
 
  not_us:
   _chain_intr(old_int2f);
 }
 
-int findfirst(const char far *path, SRCHREC_PTR data)
+int findfirst(const char far *path, SRCHREC_PTR search)
 {
   errcode err;
+  DIRREC_PTR dos_entry;
+  char far *pattern;
+  uint8_t search_attr;
 
+
+  consolef("PATH: %ls\n", DOS_SDA_VALUE(file_name));
+  // FIXME - make these arguments instead of accessing globals
+  dos_entry = DOS_SDA_POINTER(dirrec);
+  pattern = DOS_SDA_VALUE(fcb_name);
+  search_attr = DOS_SDA_VALUE(srch_attr);
+  
+  consolef("FF PATTERN: 0x%02x %ls\n", search_attr, pattern);
+
+  if (search_attr & ATTR_VOLUME_LABEL) {
+    consolef("VOLUME\n");
+    search->drive_num = drive_num | 0x80;
+    search->sequence = 0;
+    search->sector = 0;
+    _fstrcpy(dos_entry->name, "FUJINET1234");
+    dos_entry->attr = 0x08;
+    dos_entry->size = 0;
+    return 0; // FIXME - use constant
+  }
 
   // FIXME - was directory already open?
   //fujifs_closedir();
@@ -138,24 +169,35 @@ int findfirst(const char far *path, SRCHREC_PTR data)
   if (err)
     return 0x38; // Unexpected network error - FIXME - use constant
 
+  consolef("FORWARDING\n");
+  return 0;
   dir_counter = 0;
-  return findnext(data);
+  return findnext(search);
 }
 
-int findnext(SRCHREC_PTR data)
+int findnext(SRCHREC_PTR search)
 {
   FN_DIRENT *ent;
   int len;
+  char far *pattern;
+  uint8_t search_attr;
+  DIRREC_PTR dos_entry;
 
 
+  // FIXME - make these arguments instead of accessing globals
+  dos_entry = DOS_SDA_POINTER(dirrec);
+  pattern = DOS_SDA_VALUE(fcb_name);
+  search_attr = search->attr_mask;
+
+  consolef("NX PATTERN: %ls\n", pattern);
   ent = fujifs_readdir();
-  data->drive_no = drive_num;
-  _fmemset(data->srch_mask, ' ', sizeof(data->srch_mask));
+  search->drive_num = drive_num;
+  _fmemset(search->srch_mask, ' ', sizeof(search->srch_mask));
   len = strlen(ent->name);
-  _fmemcpy(data->srch_mask, ent->name, len <= 11 ? len : 11);
-  data->attr_mask = 0x3f;
-  data->dir_entry_no = dir_counter++;
-  data->dir_sector = 0;
+  _fmemcpy(search->srch_mask, ent->name, len <= 11 ? len : 11);
+  search->attr_mask = 0x3f;
+  search->sequence = dir_counter++;
+  search->sector = 0;
 
   return 0;
 }

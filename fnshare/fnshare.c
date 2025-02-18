@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
   printf("CDS: 0x%08lx\n", (uint32_t) lolptr->cds_ptr);
 
   {
-    V3_CDS_PTR our_cds_ptr;
+    CDS_PTR_V3 our_cds_ptr;
     uint16_t cds_root_size;             /* Size of our CDS root string */
     char far *current_path;         /* ptr to current path in CDS */
     char far *cds_path_root = "FujiNet  :\\";       /* Root string for CDS */
@@ -93,11 +93,11 @@ int main(int argc, char *argv[])
     if (_osmajor == 3)
       our_cds_ptr = our_cds_ptr + drive_num;
     else {
-      V4_CDS_PTR t = (V4_CDS_PTR) our_cds_ptr;
+      CDS_PTR_V4 t = (CDS_PTR_V4) our_cds_ptr;
 
 
       t = t + drive_num;
-      our_cds_ptr = (V3_CDS_PTR) t;
+      our_cds_ptr = (CDS_PTR_V3) t;
     }
 
     printf("CDS data\n");

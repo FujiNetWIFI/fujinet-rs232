@@ -98,6 +98,20 @@ void printDec32(uint32_t val, uint16_t width, char leading)
   return;
 }
 
+void printString(const char *str)
+{
+  for (; str && *str; str++)
+    printChar(*str);
+  return;
+}
+
+void printFarString(const char far *str)
+{
+  for (; str && *str; str++)
+    printChar(*str);
+  return;
+}
+
 void dumpHex(void far *ptr, uint16_t count, uint16_t address)
 {
   int outer, inner;
@@ -202,14 +216,18 @@ void consolef(const char *format, ...)
 	  pf++;
 	  if (*pf == 'x')
 	    printHex32(va_arg(args, uint32_t), width, leader);
-	  if (*pf == 'i' || *pf == 'd')
+	  else if (*pf == 'i' || *pf == 'd')
 	    printDec32(va_arg(args, uint32_t), width, leader);
+	  else if (*pf == 's')
+	    printFarString(va_arg(args, char far *));
 	}
 	else {
 	  if (*pf == 'x')
 	    printHex(va_arg(args, uint16_t), width, leader);
-	  if (*pf == 'i' || *pf == 'd')
+	  else if (*pf == 'i' || *pf == 'd')
 	    printDec(va_arg(args, uint16_t), width, leader);
+	  else if (*pf == 's')
+	    printString(va_arg(args, char *));
 	}
       }
       break;
