@@ -17,7 +17,7 @@
 /* FindFirst/Next data block - ALL DOS VERSIONS */
 typedef struct {
   uint8_t drive_num;
-  char srch_mask[11];
+  char pattern[11];
   uint8_t attr_mask;
   uint16_t sequence;
   uint16_t sector;
@@ -29,7 +29,7 @@ typedef struct {
   char name[11];
   uint8_t attr;
   uint8_t _reserved1[10];
-  uint32_t time;
+  uint16_t time, date;
   uint16_t start_sector;
   long size;
 } DIRREC, far *DIRREC_PTR;
@@ -59,7 +59,7 @@ typedef struct {
   uint8_t _reserved7[72];
   SRCHREC rename_srchrec;
   DIRREC rename_dirrec;
-} SDAV3, far *SDA_PTR_V3;
+} SDA_V3, far *SDA_PTR_V3;
 
 /* Swappable DOS Area - DOS VERSION 4.xx */
 typedef struct {
@@ -90,7 +90,7 @@ typedef struct {
   uint8_t _reserved8[29];
   SRCHREC rename_srchrec;
   DIRREC rename_dirrec;
-} SDAV4, far *SDA_PTR_V4;
+} SDA_V4, far *SDA_PTR_V4;
 
 /* DOS Current directory structure - DOS VERSION 3.xx */
 typedef struct {
@@ -98,7 +98,7 @@ typedef struct {
   uint16_t flags;
   uint8_t _reserved1[10];
   uint16_t root_ofs;
-} CDSV3, far *CDS_PTR_V3;
+} CDS_V3, far *CDS_PTR_V3;
 
 /* DOS Current directory structure - DOS VERSION 4.xx */
 typedef struct {
@@ -107,7 +107,7 @@ typedef struct {
   uint8_t _reserved1[10];
   uint16_t root_ofs;
   uint8_t _reserved2[7];
-} CDSV4, far *CDS_PTR_V4;
+} CDS_V4, far *CDS_PTR_V4;
 
 /* DOS List of lists structure - DOS VERSIONS 3.1 thru 4 */
 /* We don't need much of it. */

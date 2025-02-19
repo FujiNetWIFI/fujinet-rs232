@@ -2,6 +2,7 @@
  */
 
 #include "parser.h"
+#include "fujifs.h"
 #include <stdint.h>
 #include <string.h>
 #include <strings.h> // for strcasecmp()

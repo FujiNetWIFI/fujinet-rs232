@@ -1,13 +1,18 @@
 /* Contributed by fozztexx@fozztexx.com
  */
 
-#ifndef _NET_H
-#define _NET_H
+#ifndef _FUJIFS_H
+#define _FUJIFS_H
 
 #include <stddef.h>
 #include <stdint.h>
+#include <sys/types.h> // for off_t
 #include <fcntl.h>
 #include <time.h>
+
+#if __WATCOMC__ < 1300
+#define strcasecmp stricmp
+#endif
 
 typedef int errcode;
 typedef struct {
@@ -35,4 +40,4 @@ extern errcode fujifs_closedir();
 extern FN_DIRENT *fujifs_readdir();
 extern errcode fujifs_chdir();
 
-#endif /* _NET_H */
+#endif /* _FUJIFS_H */

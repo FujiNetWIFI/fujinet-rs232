@@ -76,12 +76,24 @@ void set_intr_retval(uint16_t);
 #pragma aux set_intr_retval = \
   "mov ss:[bp+22],ax" \
   "test ax,ax"	      \
-  "jnz set_carry"     \
+  "jnz is_err"     \
   "clc"		      \
   "jmp done"	      \
-  "set_carry: stc"    \
+  "is_err: stc"    \
   "done:"	      \
   parm [ax]
+
+uint16_t get_intr_retval(void);
+#pragma aux get_intr_retval = \
+  "mov ax,ss:[bp+22]" \
+  modify [ax]
+
+extern __segment getSS(void);
+#pragma aux getSS = \
+    "mov ax, ss";
+extern __segment getBP(void);
+#pragma aux getBP = \
+    "mov ax, bp";
 
 void interrupt far redirector(union INTPACK regs)
 {
@@ -96,8 +108,7 @@ void interrupt far redirector(union INTPACK regs)
   //consolef("");
 
   if (func != REDIRECTOR_FUNC) { // Not our redirector call, pass it down the chain
-    _chain_intr(old_int2f);
-    return; // Should never reach here
+    goto not_us;
   }
 
   if (subfunc == SUBF_INQUIRY) {
@@ -127,8 +138,9 @@ void interrupt far redirector(union INTPACK regs)
     break;
   }
 
-  consolef("RESULT: 0x%04x\n", result);
+  //consolef("RESULT: 0x%04x SS:%04x BP:%04x\n", result, getSS(), getBP());
   set_intr_retval(result);
+  //consolef("RETVAL: 0x%04x\n", get_intr_retval());
   return;
 
  not_us:
@@ -143,22 +155,29 @@ int findfirst(const char far *path, SRCHREC_PTR search)
   uint8_t search_attr;
 
 
-  consolef("PATH: %ls\n", DOS_SDA_VALUE(file_name));
+  //consolef("PATH: %ls\n", DOS_SDA_VALUE(file_name));
   // FIXME - make these arguments instead of accessing globals
   dos_entry = DOS_SDA_POINTER(dirrec);
   pattern = DOS_SDA_VALUE(fcb_name);
   search_attr = DOS_SDA_VALUE(srch_attr);
-  
-  consolef("FF PATTERN: 0x%02x %ls\n", search_attr, pattern);
+
+  //consolef("FF PATTERN: 0x%02x %ls\n", search_attr, pattern);
 
   if (search_attr & ATTR_VOLUME_LABEL) {
-    consolef("VOLUME\n");
-    search->drive_num = drive_num | 0x80;
+    //consolef("VOLUME\n");
+    search->drive_num = (drive_num + 1) | 0x80;
+    _fmemmove(search->pattern, pattern, sizeof(search->pattern));
+    search->attr_mask = search_attr;
     search->sequence = 0;
-    search->sector = 0;
+    search->sector = 0; // PHANTOM sets this to path length
     _fstrcpy(dos_entry->name, "FUJINET1234");
     dos_entry->attr = 0x08;
+    dos_entry->time = 0;
+    dos_entry->date = 0;
     dos_entry->size = 0;
+
+    //dumpHex(search, sizeof(*search), 0);
+    //dumpHex(dos_entry, sizeof(*dos_entry), 0);
     return 0; // FIXME - use constant
   }
 
@@ -169,8 +188,6 @@ int findfirst(const char far *path, SRCHREC_PTR search)
   if (err)
     return 0x38; // Unexpected network error - FIXME - use constant
 
-  consolef("FORWARDING\n");
-  return 0;
   dir_counter = 0;
   return findnext(search);
 }
@@ -180,8 +197,10 @@ int findnext(SRCHREC_PTR search)
   FN_DIRENT *ent;
   int len;
   char far *pattern;
+  const char *dot, *ext;
   uint8_t search_attr;
   DIRREC_PTR dos_entry;
+  struct tm *lt;
 
 
   // FIXME - make these arguments instead of accessing globals
@@ -189,15 +208,42 @@ int findnext(SRCHREC_PTR search)
   pattern = DOS_SDA_VALUE(fcb_name);
   search_attr = search->attr_mask;
 
-  consolef("NX PATTERN: %ls\n", pattern);
+  search->sequence++;
+  //consolef("NX %i PATTERN: %ls\n", search->sequence, pattern);
+
   ent = fujifs_readdir();
-  search->drive_num = drive_num;
-  _fmemset(search->srch_mask, ' ', sizeof(search->srch_mask));
-  len = strlen(ent->name);
-  _fmemcpy(search->srch_mask, ent->name, len <= 11 ? len : 11);
-  search->attr_mask = 0x3f;
-  search->sequence = dir_counter++;
-  search->sector = 0;
+  if (!ent)
+    return 18; // FIXME - use constant
+
+  consolef("ENTRY: %s\n", ent->name);
+  search->drive_num = (drive_num + 1) | 0x80;
+  _fmemmove(search->pattern, pattern, sizeof(search->pattern));
+  search->attr_mask = search_attr;
+  search->sector = 0; // PHANTOM sets this to path length
+
+  _fmemset(dos_entry->name, ' ', sizeof(search->pattern));
+  dot = strchr(ent->name, '.');
+  if (dot)
+    ext = dot + 1;
+  else {
+    dot = ent->name + strlen(ent->name);
+    ext = NULL;
+  }
+  len = dot - ent->name;
+  _fmemcpy(dos_entry->name, ent->name, len <= 8 ? len : 8);
+  if (ext) {
+    len = strlen(ext);
+    _fmemcpy(&dos_entry->name[8], ext, len <= 3 ? len : 3);
+  }
+
+  dos_entry->attr = ent->isdir ? 0x08 : 0x10; // FIXME - use constants
+
+  lt = localtime(&ent->mtime);
+  dos_entry->time = (lt->tm_sec / 2) | (lt->tm_min << 5) | (lt->tm_hour << 11);
+  dos_entry->date = (lt->tm_mday) | ((lt->tm_mon + 1) << 5) | ((lt->tm_year - 80) << 9);
+
+  dos_entry->size = search->sequence * 7;
+
 
   return 0;
 }
