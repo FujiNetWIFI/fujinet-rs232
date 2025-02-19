@@ -72,12 +72,12 @@ errcode fujifs_open(const char *path, uint16_t mode)
   ennify(path);
   reply = fujiF5_write(NETDEV, CMD_OPEN, mode, 0, &fujifs_buf, OPEN_SIZE);
   if (reply != REPLY_COMPLETE)
-    printf("FN OPEN REPLY: 0x%02x\n", reply);
+    printf("FUJIFS_OPEN OPEN REPLY: 0x%02x\n", reply);
   // FIXME - check err
 
   reply = fujiF5_read(NETDEV, CMD_STATUS, 0, 0, &status, sizeof(status));
   if (reply != REPLY_COMPLETE)
-    printf("FN STATUS REPLY: 0x%02x\n", reply);
+    printf("FUJIFS_OPEN STATUS REPLY: 0x%02x\n", reply);
   // FIXME - check err
 
 #if 0
@@ -115,7 +115,7 @@ size_t fujifs_read(uint8_t *buf, size_t length)
   // Check how many bytes are available
   reply = fujiF5_read(NETDEV, CMD_STATUS, 0, 0, &status, sizeof(status));
   if (reply != REPLY_COMPLETE)
-    printf("FN STATUS REPLY: 0x%02x\n", reply);
+    printf("FUJIFS_READ STATUS REPLY: 0x%02x\n", reply);
   // FIXME - check err
 
 #if 0
@@ -263,7 +263,7 @@ errcode fujifs_chdir(const char *path)
   ennify(path);
   reply = fujiF5_write(NETDEV, CMD_CHDIR, 0x0000, 0, &fujifs_buf, OPEN_SIZE);
   if (reply != REPLY_COMPLETE)
-    printf("FN OPEN REPLY: 0x%02x\n", reply);
+    printf("FUJIFS_CHDIR CHDIR REPLY: 0x%02x\n", reply);
   // FIXME - check err
   return 0;
 }
