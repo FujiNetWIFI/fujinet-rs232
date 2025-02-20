@@ -102,7 +102,6 @@ void print_dir()
   errcode err;
   size_t len;
   FN_DIRENT *ent;
-  struct tm *tm_p;
 
 
   err = fujifs_opendir();
@@ -113,8 +112,7 @@ void print_dir()
 
 #if 1
   while ((ent = fujifs_readdir())) {
-    tm_p = localtime(&ent->mtime);
-    strftime(buf, sizeof(buf) - 1, "%Y-%b-%d %H:%M", tm_p);
+    strftime(buf, sizeof(buf) - 1, "%Y-%b-%d %H:%M", &ent->mtime);
     if (ent->isdir)
       printf("%-*s %-*s %s\n", COL_NAME, ent->name, COL_SIZE, "<DIR>", buf);
     else

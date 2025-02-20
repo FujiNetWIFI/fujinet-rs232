@@ -11,7 +11,14 @@
 #define DOS_STRUCT_POINTER(type, var, field) \
   ((_osmajor == 3) ? &((type##_V3)(var))->field : &((type##_V4)(var))->field)
 
-#define ATTR_VOLUME_LABEL	0x08
+enum {
+  ATTR_READ_ONLY        = 0x01,
+  ATTR_HIDDEN           = 0x02,
+  ATTR_SYSTEM           = 0x04,
+  ATTR_VOLUME_LABEL     = 0x08,
+  ATTR_DIRECTORY        = 0x10,
+  ATTR_ARCHIVE          = 0x20,
+};
 
 #pragma pack(push, 1)
 /* FindFirst/Next data block - ALL DOS VERSIONS */

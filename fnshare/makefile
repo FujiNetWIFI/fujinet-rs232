@@ -10,13 +10,13 @@ LDFLAGS = &
 	LIBPATH ../fujicom
 
 CFILES  = fnshare.c netredir.c
-OBJS = $(CFILES:.c=.obj) $(AFILES:.asm=.obj)
+OBJS = $(CFILES:.c=.obj) $(AFILES:.asm=.obj) ../sys/print.obj ../ncopy/fujifs.obj
 
 $(TARGET): $(OBJS)
 	$(LD) $(LDFLAGS) &
 	  disable 1014 &
 	  name $@ &
-	  file {$(OBJS) ../sys/print.obj ../ncopy/fujifs.obj} &
+	  file {$(OBJS)} &
 	  library {fujicoms.lib clibs.lib}
 
 fnshare.obj: fnshare.c .AUTODEPEND

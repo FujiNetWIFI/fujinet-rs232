@@ -158,7 +158,7 @@ int findfirst(const char far *path, SRCHREC_PTR search)
   //consolef("PATH: %ls\n", DOS_SDA_VALUE(file_name));
   // FIXME - make these arguments instead of accessing globals
   dos_entry = DOS_SDA_POINTER(dirrec);
-  pattern = DOS_SDA_VALUE(fcb_name);
+  pattern = DOS_SDA_POINTER(fcb_name[0]);
   search_attr = DOS_SDA_VALUE(srch_attr);
 
   //consolef("FF PATTERN: 0x%02x %ls\n", search_attr, pattern);
@@ -171,7 +171,7 @@ int findfirst(const char far *path, SRCHREC_PTR search)
     search->sequence = 0;
     search->sector = 0; // PHANTOM sets this to path length
     _fstrcpy(dos_entry->name, "FUJINET1234");
-    dos_entry->attr = 0x08;
+    dos_entry->attr = ATTR_VOLUME_LABEL;
     dos_entry->time = 0;
     dos_entry->date = 0;
     dos_entry->size = 0;
@@ -200,7 +200,6 @@ int findnext(SRCHREC_PTR search)
   const char *dot, *ext;
   uint8_t search_attr;
   DIRREC_PTR dos_entry;
-  struct tm *lt;
 
 
   // FIXME - make these arguments instead of accessing globals
@@ -215,7 +214,15 @@ int findnext(SRCHREC_PTR search)
   if (!ent)
     return 18; // FIXME - use constant
 
-  consolef("ENTRY: %s\n", ent->name);
+#if 0
+  consolef("ENTRY: \"%s\"\n", ent->name);
+
+  if (search->sequence > 2) {
+    for (;;)
+      ;
+  }
+#endif
+  
   search->drive_num = (drive_num + 1) | 0x80;
   _fmemmove(search->pattern, pattern, sizeof(search->pattern));
   search->attr_mask = search_attr;
@@ -236,13 +243,14 @@ int findnext(SRCHREC_PTR search)
     _fmemcpy(&dos_entry->name[8], ext, len <= 3 ? len : 3);
   }
 
-  dos_entry->attr = ent->isdir ? 0x08 : 0x10; // FIXME - use constants
+  dos_entry->attr = ent->isdir ? ATTR_DIRECTORY : 0;
 
-  lt = localtime(&ent->mtime);
-  dos_entry->time = (lt->tm_sec / 2) | (lt->tm_min << 5) | (lt->tm_hour << 11);
-  dos_entry->date = (lt->tm_mday) | ((lt->tm_mon + 1) << 5) | ((lt->tm_year - 80) << 9);
+  dos_entry->time = (ent->mtime.tm_sec / 2)
+    | (ent->mtime.tm_min << 5) | (ent->mtime.tm_hour << 11);
+  dos_entry->date = (ent->mtime.tm_mday)
+    | ((ent->mtime.tm_mon + 1) << 5) | ((ent->mtime.tm_year - 80) << 9);
 
-  dos_entry->size = search->sequence * 7;
+  dos_entry->size = ent->size;
 
 
   return 0;

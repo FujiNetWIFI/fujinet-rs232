@@ -18,7 +18,7 @@ typedef int errcode;
 typedef struct {
   const char *name;
   off_t size;
-  time_t ctime, mtime;
+  struct tm ctime, mtime;
   unsigned char isdir:1;
 } FN_DIRENT;
 

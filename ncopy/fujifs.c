@@ -27,7 +27,6 @@ typedef struct {
   
 static uint8_t fujifs_buf[256];
 static FN_DIR cur_dir;
-static struct tm ftm;
 
 // Copy path to fujifs_buf and make sure it has N: prefix
 void ennify(const char *path)
@@ -162,13 +161,46 @@ errcode fujifs_closedir()
   return 0;
 }
 
+/* Open Watcom strtok doesn't seem to work in an interrupt */
+char *fujifs_strtok(char *str, const char *delim)
+{
+  static char *last;
+  int idx;
+
+
+  if (!str)
+    str = last;
+
+  /* Skip over any leading characters in delim */
+  for (; *str; str++) {
+    for (idx = 0; delim[idx]; idx++)
+      if (*str == delim[idx])
+	break;
+    if (!delim[idx])
+      break;
+  }
+
+  /* Find next delim */
+  for (last = str; *last; last++) {
+    for (idx = 0; delim[idx]; idx++)
+      if (*last == delim[idx])
+	break;
+    if (delim[idx])
+      break;
+  }
+
+  *last = 0;
+  last++;
+  return str;
+}
+
 FN_DIRENT *fujifs_readdir()
 {
   size_t len;
   static FN_DIRENT ent;
   size_t idx;
   char *cptr1, *cptr2, *cptr3;
-  int v1, v2, v3;
+  int len1, len2;
 
 
   // Refill buffer if it's empty
@@ -189,30 +221,30 @@ FN_DIRENT *fujifs_readdir()
        idx++)
     ;
   if (idx == cur_dir.length) {
-    v1 = cur_dir.length - cur_dir.position;
-    memmove(fujifs_buf, &fujifs_buf[cur_dir.position], v1);
-    v2 = fujifs_read(&fujifs_buf[v1], sizeof(fujifs_buf) - v1);
-    if (!v2)
+    len1 = cur_dir.length - cur_dir.position;
+    memmove(fujifs_buf, &fujifs_buf[cur_dir.position], len1);
+    len2 = fujifs_read(&fujifs_buf[len1], sizeof(fujifs_buf) - len1);
+    if (!len2)
       return NULL;
     cur_dir.position = 0;
-    cur_dir.length = v1 + v2;
+    cur_dir.length = len1 + len2;
   }
 
   memset(&ent, 0, sizeof(ent));
 
   // get filename
-  cptr1 = strtok(&fujifs_buf[cur_dir.position], DIR_DELIM);
+  cptr1 = fujifs_strtok(&fujifs_buf[cur_dir.position], DIR_DELIM);
   ent.name = cptr1;
 
   // get extension
-  cptr2 = strtok(NULL, DIR_DELIM);
+  cptr2 = fujifs_strtok(NULL, DIR_DELIM);
   if (cptr2 - cptr1 < 10) {
-    v1 = strlen(cptr1);
-    cptr1[v1] = '.';
-    memmove(&cptr1[v1 + 1], cptr2, strlen(cptr2) + 1);
+    len1 = strlen(cptr1);
+    cptr1[len1] = '.';
+    memmove(&cptr1[len1 + 1], cptr2, strlen(cptr2) + 1);
 
     // get size or dir
-    cptr1 = strtok(NULL, DIR_DELIM);
+    cptr1 = fujifs_strtok(NULL, DIR_DELIM);
   }
   else {
     // extension is too far away, it must be the size
@@ -225,32 +257,30 @@ FN_DIRENT *fujifs_readdir()
     ent.size = atol(cptr1);
 
   // get date
-  cptr1 = strtok(NULL, DIR_DELIM);
-
+  cptr1 = fujifs_strtok(NULL, DIR_DELIM);
+  
   // get time
-  cptr2 = strtok(NULL, DIR_DELIM);
+  cptr2 = fujifs_strtok(NULL, DIR_DELIM);
 
   // done parsing record, parse date & time now
-  cptr3 = strtok(cptr1, "-");
-  ftm.tm_mon = atoi(cptr3) - 1;
-  cptr3 = strtok(NULL, "-");
-  ftm.tm_mday = atoi(cptr3);
-  cptr3 = strtok(NULL, "-");
-  ftm.tm_year = atoi(cptr3) + 1900;
-  if (ftm.tm_year < 1975)
-    ftm.tm_year += 100;
-  ftm.tm_year -= 1900;
+  cptr3 = fujifs_strtok(cptr1, "-");
+  ent.mtime.tm_mon = atoi(cptr3) - 1;
+  cptr3 = fujifs_strtok(NULL, "-");
+  ent.mtime.tm_mday = atoi(cptr3);
+  cptr3 = fujifs_strtok(NULL, "-");
+  ent.mtime.tm_year = atoi(cptr3) + 1900;
+  if (ent.mtime.tm_year < 1975)
+    ent.mtime.tm_year += 100;
+  ent.mtime.tm_year -= 1900;
 
-  cptr3 = strtok(cptr2, ":");
-  ftm.tm_hour = atoi(cptr3);
-  cptr3 = strtok(NULL, " ");
-  ftm.tm_min = atoi(cptr3);
-  ftm.tm_hour = ftm.tm_hour % 12 + (tolower(cptr3[2]) == 'p' ? 12 : 0);
+  cptr3 = fujifs_strtok(cptr2, ":");
+  ent.mtime.tm_hour = atoi(cptr3);
+  cptr3 += strlen(cptr3) + 1;
+  ent.mtime.tm_min = atoi(cptr3);
+  ent.mtime.tm_hour = ent.mtime.tm_hour % 12 + (tolower(cptr3[2]) == 'p' ? 12 : 0);
 
-  ent.mtime = mktime(&ftm);
-
-  v1 = (cptr3 - fujifs_buf) + 4;
-  cur_dir.position = v1;
+  len1 = (cptr3 - fujifs_buf) + 4;
+  cur_dir.position = len1;
 
   return &ent;
 }
