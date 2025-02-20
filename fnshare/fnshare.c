@@ -9,7 +9,11 @@
 #include <strings.h> // strcasecmp
 #include <ctype.h>
 #include <conio.h>
+
+#undef DEBUG
+#ifdef DEBUG
 #include "../sys/print.h"
+#endif
 
 //#pragma data_seg("BEGTEXT", "CODE");
 //#pragma code_seg("BEGTEXT", "CODE");
@@ -74,13 +78,17 @@ int main(int argc, char *argv[])
   regs.x.ax = 0x5D06;
   intdosx(&regs, &regs, &segr);
   sda_ptr = MK_FP(segr.ds, regs.x.si);
+#ifdef DEBUG
   printf("SDA: 0x%08lx\n", (uint32_t) sda_ptr);
+#endif
 
   regs.x.ax = 0x5200;
   intdosx(&regs, &regs, &segr);
   lolptr = (LOLREC_PTR) MK_FP(segr.es, regs.x.bx);
+#ifdef DEBUG
   printf("LOL: 0x%08lx\n", (uint32_t) lolptr);
   printf("CDS: 0x%08lx\n", (uint32_t) lolptr->cds_ptr);
+#endif
 
   {
     CDS_PTR_V3 our_cds_ptr;
@@ -100,8 +108,10 @@ int main(int argc, char *argv[])
       our_cds_ptr = (CDS_PTR_V3) t;
     }
 
+#ifdef DEBUG
     printf("CDS data\n");
     dumpHex(lolptr, sizeof(*lolptr), 0);
+#endif
 
     if (drive_num >= lolptr->last_drive) {
       printf("Drive letter %c higher than last drive %c",
@@ -131,7 +141,9 @@ int main(int argc, char *argv[])
 
   printf("Installing FujiNet redirector on drive %c:\n", drive_letter);
   old_int2f = _dos_getvect(DOS_INT_REDIR);
+#ifdef DEBUG
   printf("Old vector: 0x%08lx\n", (uint32_t) old_int2f);
+#endif
   _dos_setvect(DOS_INT_REDIR, redirector);
 
   // Become a TSR
@@ -150,11 +162,15 @@ int main(int argc, char *argv[])
     end -= _psp << 4;
     end += 15;
 
+#ifdef DEBUG
     printf("Heap: 0x%08lx  PSP: 0x%04x\n", (uint32_t) heap, _psp);
     printf("CS: 0x%04x\n", getCS());
     printf("Para: %04x\n", end);
+#endif
     psp_ptr = MK_FP(_psp, 0);
+#ifdef DEBUG
     printf("Top seg: %04x\n", psp_ptr[1]);
+#endif
     _dos_keep(0, end >> 4);
   }
 #endif

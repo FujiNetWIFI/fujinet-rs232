@@ -72,17 +72,6 @@ static redirectFunction_t dispatchTable[] = {
 };
 #endif
 
-void set_intr_retval(uint16_t);
-#pragma aux set_intr_retval = \
-  "mov ss:[bp+22],ax" \
-  "test ax,ax"	      \
-  "jnz is_err"     \
-  "clc"		      \
-  "jmp done"	      \
-  "is_err: stc"    \
-  "done:"	      \
-  parm [ax]
-
 uint16_t get_intr_retval(void);
 #pragma aux get_intr_retval = \
   "mov ax,ss:[bp+22]" \
@@ -95,7 +84,7 @@ extern __segment getBP(void);
 #pragma aux getBP = \
     "mov ax, bp";
 
-void interrupt far redirector(union INTPACK regs)
+void __interrupt far redirector(union INTPACK regs)
 {
   uint8_t func, subfunc;
   char far *path;
@@ -112,7 +101,8 @@ void interrupt far redirector(union INTPACK regs)
   }
 
   if (subfunc == SUBF_INQUIRY) {
-    set_intr_retval(0xff);
+    regs.x.ax = 0x00ff;
+    regs.x.flags &= ~INTR_CF;
     return;
   }
 
@@ -133,13 +123,18 @@ void interrupt far redirector(union INTPACK regs)
     break;
 
   default:
-    consolef("FN REDIRECT SUB 0x%02x ES: 0x%04x DI: 0x%04x\n", subfunc, regs.x.es, regs.x.di);
+    //consolef("FN REDIRECT SUB 0x%02x ES: 0x%04x DI: 0x%04x\n", subfunc, regs.x.es, regs.x.di);
     result = 0x16;
     break;
   }
 
   //consolef("RESULT: 0x%04x SS:%04x BP:%04x\n", result, getSS(), getBP());
-  set_intr_retval(result);
+  //set_intr_retval(result);
+  regs.x.ax = result;
+  if (result)
+    regs.x.flags |= INTR_CF;
+  else
+    regs.x.flags &= ~INTR_CF;
   //consolef("RETVAL: 0x%04x\n", get_intr_retval());
   return;
 
@@ -211,8 +206,12 @@ int findnext(SRCHREC_PTR search)
   //consolef("NX %i PATTERN: %ls\n", search->sequence, pattern);
 
   ent = fujifs_readdir();
-  if (!ent)
+  if (!ent) {
+    _fmemset(search, 0, sizeof(*search));
+    _fmemset(dos_entry, 0, sizeof(*dos_entry));
+    _fstrcpy(dos_entry->name, "NO MORE!!!!");
     return 18; // FIXME - use constant
+  }
 
 #if 0
   consolef("ENTRY: \"%s\"\n", ent->name);
