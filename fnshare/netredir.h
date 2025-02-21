@@ -46,9 +46,6 @@ extern char fuji_cwd[];
 #endif
 
 extern void interrupt far redirector(union INTPACK regs);
-extern int findfirst(const char far *path, SRCHREC_PTR data);
-extern int findnext(SRCHREC_PTR data);
-extern int chdir();
 
 // FIXME - these don't belong here
 extern __segment getCS(void);

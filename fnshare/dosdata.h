@@ -3,6 +3,9 @@
 
 #include <stdint.h>
 
+#define DOS_MAX_PATHLEN         128
+#define DOS_FILENAME_LEN        11
+
 /* Macro to get value from DOS structs which automatically handles checking _osmajor */
 #define DOS_STRUCT_VALUE(type, var, field) \
   ((_osmajor == 3) ? ((type##_V3)(var))->field : ((type##_V4)(var))->field)
@@ -50,8 +53,8 @@ typedef struct {
   uint8_t mm;
   uint16_t yy_1980;
   uint8_t _reserved2[96];
-  char file_name[128];
-  char file_name_2[128];
+  char path1[128];
+  char path2[128];
   SRCHREC srchrec;
   DIRREC dirrec;
   uint8_t _reserved3[81];
@@ -77,8 +80,8 @@ typedef struct {
   uint8_t mm;
   uint16_t yy_1980;
   uint8_t _reserved2[106];
-  char file_name[128];
-  char file_name_2[128];
+  char path1[128];
+  char path2[128];
   SRCHREC srchrec;
   DIRREC dirrec;
   uint8_t _reserved3[88];
@@ -124,6 +127,26 @@ typedef struct {
   uint8_t _reserved2[7];
   uint8_t last_drive;
 } LOLREC, far *LOLREC_PTR;
+
+/* DOS System File Table entry - ALL DOS VERSIONS */
+// Some of the fields below are defined by the redirector, and differ
+// from the SFT normally found under DOS
+typedef struct {
+  uint16_t handle_count;
+  uint16_t open_mode;
+  uint8_t file_attr;
+  uint16_t dev_info_word;
+  uint8_t far *dev_drvr_ptr;
+  uint16_t start_sector;
+  uint32_t file_time;
+  int32_t file_size;
+  int32_t file_pos;
+  uint16_t rel_sector;
+  uint16_t abs_sector;
+  uint16_t dir_sector;
+  uint8_t dir_entry_no;
+  char file_name[11];
+} SFTREC, far *SFTREC_PTR;
 
 #pragma pack(pop)
 

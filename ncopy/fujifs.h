@@ -33,8 +33,9 @@ extern errcode fujifs_open_url(const char *url, const char *user, const char *pa
 extern errcode fujifs_close_url();
 extern errcode fujifs_open(const char *path, uint16_t mode);
 extern errcode fujifs_close();
-extern size_t fujifs_read(uint8_t *buf, size_t length);
-extern size_t fujifs_write(uint8_t *buf, size_t length);
+extern size_t fujifs_read(uint8_t far *buf, size_t length);
+extern size_t fujifs_write(uint8_t far *buf, size_t length);
+extern size_t fujifs_tell();
 extern errcode fujifs_opendir();
 extern errcode fujifs_closedir();
 extern FN_DIRENT *fujifs_readdir();

@@ -106,7 +106,7 @@ errcode fujifs_close()
 }
 
 // Returns number of bytes read
-size_t fujifs_read(uint8_t *buf, size_t length)
+size_t fujifs_read(uint8_t far *buf, size_t length)
 {
   int reply;
 
@@ -135,7 +135,7 @@ size_t fujifs_read(uint8_t *buf, size_t length)
 }
 
 // Returns number of bytes written
-size_t fujifs_write(uint8_t *buf, size_t length)
+size_t fujifs_write(uint8_t far *buf, size_t length)
 {
   int reply;
 
@@ -144,6 +144,23 @@ size_t fujifs_write(uint8_t *buf, size_t length)
   if (reply != REPLY_COMPLETE)
     return 0;
   return length;
+}
+
+size_t fujifs_tell()
+{
+  int reply;
+
+
+  // Check how many bytes are unread
+  reply = fujiF5_read(NETDEV, CMD_STATUS, 0, 0, &status, sizeof(status));
+  if (reply != REPLY_COMPLETE)
+    printf("FUJIFS_TELL STATUS REPLY: 0x%02x\n", reply);
+  // FIXME - check err
+
+  if ((status.errcode > NETWORK_SUCCESS && !status.length)
+      /* || !status.connected // status.connected doesn't work */)
+    return 0;
+  return status.length;
 }
 
 errcode fujifs_opendir()
