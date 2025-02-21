@@ -10,6 +10,8 @@
 #include <dos.h>
 #include <stdlib.h>
 
+#include "../sys/print.h"
+
 // FIXME - find available network device
 #define NETDEV DEVICEID_FN_NETWORK
 #define OPEN_SIZE 256
@@ -81,14 +83,18 @@ errcode fujifs_open(const char *path, uint16_t mode)
 
 #if 0
   printf("FN STATUS: len %i  con %i  err %i\n",
-	 status.length, status.connected, status.errcode);
+         status.length, status.connected, status.errcode);
 #endif
   // FIXME - apparently the error returned when opening in write mode should be ignored?
   if (mode == FUJIFS_WRITE)
     return 0;
 
-  if (status.errcode > NETWORK_SUCCESS && !status.length)
+  if (status.errcode > NETWORK_SUCCESS && !status.length) {
+    // FIXME - for some reason FujiNet sends EOF when it really means FILE NOT FOUND
+    if (status.errcode == NETWORK_ERROR_END_OF_FILE)
+      status.errcode = NETWORK_ERROR_FILE_NOT_FOUND;
     return status.errcode;
+  }
 #if 0
   // FIXME - field doesn't work
   if (!status.connected)
@@ -97,7 +103,6 @@ errcode fujifs_open(const char *path, uint16_t mode)
   
   return 0;
 }
-
 
 errcode fujifs_close()
 {
@@ -119,7 +124,7 @@ size_t fujifs_read(uint8_t far *buf, size_t length)
 
 #if 0
   printf("FN STATUS: len %i  con %i  err %i\n",
-	 status.length, status.connected, status.errcode);
+         status.length, status.connected, status.errcode);
 #endif
   if ((status.errcode > NETWORK_SUCCESS && !status.length)
       /* || !status.connected // status.connected doesn't work */)
@@ -192,7 +197,7 @@ char *fujifs_strtok(char *str, const char *delim)
   for (; *str; str++) {
     for (idx = 0; delim[idx]; idx++)
       if (*str == delim[idx])
-	break;
+        break;
     if (!delim[idx])
       break;
   }
@@ -201,7 +206,7 @@ char *fujifs_strtok(char *str, const char *delim)
   for (last = str; *last; last++) {
     for (idx = 0; delim[idx]; idx++)
       if (*last == delim[idx])
-	break;
+        break;
     if (delim[idx])
       break;
   }
@@ -228,7 +233,7 @@ FN_DIRENT *fujifs_readdir()
 
   for (idx = cur_dir.position;
        idx < cur_dir.length &&
-	 (fujifs_buf[idx] == ' ' || fujifs_buf[idx] == '\r' || fujifs_buf[idx] == '\n');
+         (fujifs_buf[idx] == ' ' || fujifs_buf[idx] == '\r' || fujifs_buf[idx] == '\n');
        idx++)
     ;
   cur_dir.position = idx;

@@ -6,6 +6,19 @@
 #define DOS_MAX_PATHLEN         128
 #define DOS_FILENAME_LEN        11
 
+enum {
+  MODE_READONLY         = 0x00,
+  MODE_WRITEONLY        = 0x01,
+  MODE_READWRITE        = 0x02,
+  MODE_CASESENSITVE     = 0x03,
+  MODE_DENYALL          = 0x10,
+  MODE_DENYWRITE        = 0x20,
+  MODE_DENYREAD         = 0x30,
+  MODE_DENYNONE         = 0x40,
+  MODE_NETWORK          = 0x70,
+  MODE_INHERITANCE      = 0x80,
+};
+
 /* Macro to get value from DOS structs which automatically handles checking _osmajor */
 #define DOS_STRUCT_VALUE(type, var, field) \
   ((_osmajor == 3) ? ((type##_V3)(var))->field : ((type##_V4)(var))->field)

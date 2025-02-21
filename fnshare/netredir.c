@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dos.h>
+#include <ctype.h>
 #include "../sys/print.h"
 
 /* Get value of field from [S]wappable [D]OS [A]rea */
@@ -36,9 +37,12 @@ char *undosify_path(const char far *path)
     return NULL;
   _fstrncpy(temp_path, backslash, sizeof(temp_path));
 
-  for (idx = 0; temp_path[idx]; idx++)
+  for (idx = 0; temp_path[idx]; idx++) {
     if (temp_path[idx] == '\\')
       temp_path[idx] = '/';
+    else // FIXME - FujiNet should be handling the case fixing
+      temp_path[idx] = tolower(temp_path[idx]);
+  }
   
   return temp_path;
 }
@@ -108,7 +112,7 @@ int findnext(SRCHREC_PTR search)
   dos_entry->size = ent->size;
 
 
-  return 0;
+  return DOSERR_NONE;
 }
 
 int findfirst(const char far *path, SRCHREC_PTR search)
@@ -162,10 +166,14 @@ int chdir()
 
   new_dir = DOS_SDA_VALUE(path1);
 
+#if 0
   consolef("CWD: \"%ls\"\n", DOS_SDA_VALUE(cdsptr));
   consolef("NEW: \"%ls\"\n", new_dir);
+#endif
   new_dir = undosify_path(new_dir);
+#if 0
   consolef("CD TO \"%ls\"\n", new_dir);
+#endif
 
   // FIXME - convert new_dir to relative?
   fujifs_chdir(new_dir);
@@ -180,10 +188,13 @@ int open_extended(SFTREC_PTR sft)
 
 
   mode = DOS_SDA_V4_VALUE(mode_2E);
+  mode &= ~MODE_DENYNONE;
 
   // FIXME - if not opening read-only then error out for now
-  if (mode)
+  if (mode) {
+    consolef("FN OPEN_EXTENDED Unsupported mode 0x%04x\n", mode);
     return DOSERR_DISK_WRITE_PROTECTED;
+  }
   
   path = undosify_path(DOS_SDA_VALUE(path1));
   action = DOS_SDA_V4_VALUE(action_2E);
@@ -195,8 +206,14 @@ int open_extended(SFTREC_PTR sft)
 
   // FIXME - how to open multiple files?
   err = fujifs_open(path, FUJIFS_READ);
-  if (err)
+  if (err == NETWORK_ERROR_FILE_NOT_FOUND) {
+    consolef("FN OPEN_EXTENDED not found: %s\n", path);
+    return DOSERR_FILE_NOT_FOUND;
+  }
+  else if (err) {
+    consolef("FN OPEN_EXTENDED fail 0x%04x\n", err);
     return DOSERR_READ_FAULT;
+  } 
 
   _fmemset(sft, 0, sizeof(*sft));
   _fmemcpy(sft->file_name, DOS_SDA_VALUE(fcb_name), DOS_FILENAME_LEN);
@@ -286,20 +303,22 @@ void __interrupt redirector(union INTPACK regs)
     result = read_file(MK_FP(regs.x.es, regs.x.di), &regs.x.cx);
     break;
 
+  case SUBF_GETDISKSPACE:
+    // FIXME - FujiNet does not support yet
+    result = DOSERR_UNKNOWN_COMMAND;
+    break;
+    
   default:
     consolef("FN REDIRECT SUB 0x%02x\n", subfunc);
     result = DOSERR_UNKNOWN_COMMAND;
     break;
   }
 
-  //consolef("RESULT: 0x%04x SS:%04x BP:%04x\n", result, getSS(), getBP());
-  //set_intr_retval(result);
   regs.x.ax = result;
   if (result)
     regs.x.flags |= INTR_CF;
   else
     regs.x.flags &= ~INTR_CF;
-  //consolef("RETVAL: 0x%04x\n", get_intr_retval());
   return;
 
  not_us:
