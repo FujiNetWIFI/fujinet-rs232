@@ -16,7 +16,9 @@
 void interrupt far (*old_int2f)();
 void far *sda_ptr;
 uint8_t drive_num;
-static uint16_t dir_counter;
+#if 0
+char fuji_cwd[128];
+#endif
 
 typedef uint16_t(*redirectFunction_t)(void far *parms);
 
@@ -27,7 +29,7 @@ static redirectFunction_t dispatchTable[] = {
   NULL,         // 0x02 ?
   NULL,         // 0x03 make directory
   NULL,         // 0x04 ?
-  NULL,         // 0x05 current directory
+  NULL,         // 0x05 change directory
   NULL,         // 0x06 close file
   NULL,         // 0x07 commit file (flush buffer?)
   NULL,         // 0x08 read file
@@ -84,7 +86,7 @@ extern __segment getBP(void);
 #pragma aux getBP = \
     "mov ax, bp";
 
-void __interrupt far redirector(union INTPACK regs)
+void __interrupt redirector(union INTPACK regs)
 {
   uint8_t func, subfunc;
   char far *path;
@@ -122,9 +124,13 @@ void __interrupt far redirector(union INTPACK regs)
     result = findnext(DOS_SDA_POINTER(srchrec));
     break;
 
+  case SUBF_CHDIR:
+    result = chdir();
+    break;
+
   default:
-    //consolef("FN REDIRECT SUB 0x%02x ES: 0x%04x DI: 0x%04x\n", subfunc, regs.x.es, regs.x.di);
-    result = 0x16;
+    consolef("FN REDIRECT SUB 0x%02x ES: 0x%04x DI: 0x%04x\n", subfunc, regs.x.es, regs.x.di);
+    result = 0x16; // FIXME - use constant
     break;
   }
 
@@ -183,7 +189,6 @@ int findfirst(const char far *path, SRCHREC_PTR search)
   if (err)
     return 0x38; // Unexpected network error - FIXME - use constant
 
-  dir_counter = 0;
   return findnext(search);
 }
 
@@ -253,4 +258,19 @@ int findnext(SRCHREC_PTR search)
 
 
   return 0;
+}
+
+int chdir()
+{
+  char far *new_dir;
+
+
+  new_dir = DOS_SDA_VALUE(file_name);
+  new_dir += _fstrlen(DOS_SDA_VALUE(cdsptr));
+
+  consolef("CWD: \"%ls\"\n", DOS_SDA_VALUE(cdsptr));
+  consolef("CD TO \"%ls\"\n", new_dir);
+  
+  fujifs_chdir(new_dir);
+  return 0x00; // FIXME - use constant
 }

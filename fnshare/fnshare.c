@@ -15,10 +15,8 @@
 #include "../sys/print.h"
 #endif
 
-//#pragma data_seg("BEGTEXT", "CODE");
-//#pragma code_seg("BEGTEXT", "CODE");
+#define FUJINET_PATH_BASE "FujiNet  :\\"
 
-//#pragma code_seg("_INIT", "INIT")
 static union REGS regs;
 struct SREGS segr;
 
@@ -92,9 +90,7 @@ int main(int argc, char *argv[])
 
   {
     CDS_PTR_V3 our_cds_ptr;
-    uint16_t cds_root_size;             /* Size of our CDS root string */
     char far *current_path;         /* ptr to current path in CDS */
-    char far *cds_path_root = "FujiNet  :\\";       /* Root string for CDS */
 
 
     our_cds_ptr = lolptr->cds_ptr;
@@ -129,11 +125,9 @@ int main(int argc, char *argv[])
     // Set Network+Physical+NotRealNetworkDrive bits on, and
     // establish our 'root'
     our_cds_ptr->flags |= 0xc000;
-    cds_root_size = _fstrlen(cds_path_root);
-    _fstrcpy(our_cds_ptr->current_path, cds_path_root);
+    _fstrcpy(our_cds_ptr->current_path, FUJINET_PATH_BASE);
     our_cds_ptr->current_path[_fstrlen(our_cds_ptr->current_path) - 3] =
       (char) ('A' + drive_num);
-    _fstrcpy(cds_path_root, our_cds_ptr->current_path);
     current_path = our_cds_ptr->current_path;
     our_cds_ptr->root_ofs = _fstrlen(our_cds_ptr->current_path) - 1;
     current_path += our_cds_ptr->root_ofs;

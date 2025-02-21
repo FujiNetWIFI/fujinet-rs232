@@ -11,7 +11,7 @@ enum {
   SUBF_INQUIRY		= 0x00,
   SUBF_REMOVEDIR	= 0x01,
   SUBF_MAKEDIR		= 0x03,
-  SUBF_GETCWD		= 0x05,
+  SUBF_CHDIR		= 0x05,
   SUBF_CLOSE		= 0x06,
   SUBF_COMMIT		= 0x07,
   SUBF_READ		= 0x08,
@@ -41,10 +41,14 @@ enum {
 extern void interrupt far (*old_int2f)();
 extern void far *sda_ptr;
 extern uint8_t drive_num;
+#if 0
+extern char fuji_cwd[];
+#endif
 
 extern void interrupt far redirector(union INTPACK regs);
 extern int findfirst(const char far *path, SRCHREC_PTR data);
 extern int findnext(SRCHREC_PTR data);
+extern int chdir();
 
 // FIXME - these don't belong here
 extern __segment getCS(void);
