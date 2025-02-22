@@ -47,6 +47,86 @@ char *undosify_path(const char far *path)
   return temp_path;
 }
 
+int contains_wildcards(char far *path)
+{
+  int idx;
+
+
+  for (idx = 0; idx < DOS_FILENAME_LEN; idx++)
+    if (path[idx] == '?')
+      return 1;
+  return 0;
+}
+
+int filename_match(char far *pattern, char far *filename)
+{
+  int idx, jdx;
+  
+
+#if 0
+  consolef("COMPARING \"%ls\" \"%ls\"\n", pattern, filename);
+#endif
+
+  // Compare the name part (first 8 characters in DOS)
+  for (idx = 0; idx < 8; idx++) {
+    if (pattern[idx] == ' ')
+      break; // End of name in pattern
+
+    if (pattern[idx] == '?') {
+      if (!filename[idx] || filename[idx] == '.')
+	break; // '?' matches even if filename is shorter
+      continue;
+    }
+    
+    if (pattern[idx] != toupper(filename[idx])) {
+#if 0
+      consolef("POS MISMATCH: %c != %c\n", pattern[idx], toupper(filename[idx]));
+#endif
+      return 0;
+    }
+  }
+
+  // If disk name still has characters before '.', mismatch
+  if (filename[idx] && filename[idx] != '.') {
+#if 0
+    consolef("FILENAME TOO LONG\n");
+#endif
+    return 0;
+  }
+
+  // Skip '.' in disk name if present
+  if (filename[idx] == '.')
+    idx++;
+  jdx = idx;
+
+  // Compare the extension
+  for (idx = 8; idx < DOS_FILENAME_LEN; idx++, jdx++) {
+    if (pattern[idx] == ' ')
+      break; // End of extension in pattern
+
+    if (pattern[idx] == '?') {
+      if (!filename[jdx])
+	break; // '?' matches even if extension is shorter
+      continue;
+    }
+
+    if (pattern[idx] != toupper(filename[jdx])) {
+#if 0
+      consolef("EXT MISMATCH: %c != %c\n", pattern[idx], toupper(filename[jdx]));
+#endif
+      return 0;
+    }
+  }
+
+#if 0
+  if (filename[jdx]) {
+    consolef("CHARS REMAINING %i %i\n", idx, jdx);
+    return 0;
+  }
+#endif
+  return !filename[jdx];
+}
+
 int findnext(SRCHREC_PTR search)
 {
   FN_DIRENT *ent;
@@ -65,12 +145,12 @@ int findnext(SRCHREC_PTR search)
   search->sequence++;
   //consolef("NX %i PATTERN: %ls\n", search->sequence, pattern);
 
-  ent = fujifs_readdir();
-  if (!ent) {
-    _fmemset(search, 0, sizeof(*search));
-    _fmemset(dos_entry, 0, sizeof(*dos_entry));
-    _fstrcpy(dos_entry->name, "NO MORE!!!!");
-    return DOSERR_NO_MORE_FILES;
+  while (1) {
+    ent = fujifs_readdir();
+    if (!ent)
+      return DOSERR_NO_MORE_FILES;
+    if (filename_match(pattern, ent->name))
+      break;
   }
 
 #if 0
@@ -123,7 +203,7 @@ int findfirst(const char far *path, SRCHREC_PTR search)
   uint8_t search_attr;
 
 
-  //consolef("PATH: %ls\n", DOS_SDA_VALUE(file_name));
+  //consolef("PATH: %ls\n", DOS_SDA_VALUE(path1));
   // FIXME - make these arguments instead of accessing globals
   dos_entry = DOS_SDA_POINTER(dirrec);
   pattern = DOS_SDA_POINTER(fcb_name[0]);
@@ -152,7 +232,7 @@ int findfirst(const char far *path, SRCHREC_PTR search)
   // FIXME - was directory already open?
   //fujifs_closedir();
 
-  err = fujifs_opendir();
+  err = fujifs_opendir("");
   if (err)
     return DOSERR_UNEXPECTED_NETWORK_ERROR;
 
@@ -162,6 +242,7 @@ int findfirst(const char far *path, SRCHREC_PTR search)
 int chdir()
 {
   char far *new_dir;
+  errcode err;
 
 
   new_dir = DOS_SDA_VALUE(path1);
@@ -175,7 +256,12 @@ int chdir()
   consolef("CD TO \"%ls\"\n", new_dir);
 #endif
 
-  // FIXME - convert new_dir to relative?
+  /* Try to open new_path as a directory first, if it fails then it
+     either doesn't exist or wasn't a directory */
+  err = fujifs_opendir(new_dir);
+  if (err)
+    return DOSERR_PATH_NOT_FOUND;
+
   fujifs_chdir(new_dir);
   return DOSERR_NONE;
 }
@@ -211,7 +297,7 @@ int open_extended(SFTREC_PTR sft)
     return DOSERR_FILE_NOT_FOUND;
   }
   else if (err) {
-    consolef("FN OPEN_EXTENDED fail 0x%04x\n", err);
+    consolef("FN OPEN_EXTENDED fail %i\n", err);
     return DOSERR_READ_FAULT;
   } 
 

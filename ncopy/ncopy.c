@@ -104,7 +104,7 @@ void print_dir()
   FN_DIRENT *ent;
 
 
-  err = fujifs_opendir();
+  err = fujifs_opendir("");
   if (err) {
     printf("Unable to read directory\n");
     return;

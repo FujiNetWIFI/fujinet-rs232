@@ -27,16 +27,28 @@ typedef struct {
   size_t position, length;
 } FN_DIR;
   
-static uint8_t fujifs_buf[256];
+static uint8_t fujifs_buf[OPEN_SIZE];
 static FN_DIR cur_dir;
 
 // Copy path to fujifs_buf and make sure it has N: prefix
-void ennify(const char *path)
+void ennify(const char far *path)
 {
-  fujifs_buf[0] = 0;
-  if (toupper(path[0]) != 'N' || path[1] != ':')
-    strcat(fujifs_buf, "N:");
-  strncat(fujifs_buf, path, OPEN_SIZE - 1 - strlen(fujifs_buf));
+  uint16_t idx, len, remain;
+
+
+  idx = 0;
+  // FIXME - handle N1: N2: etc.
+  if (toupper(path[0]) != 'N' || path[1] != ':') {
+    memcpy(fujifs_buf, "N:", 2);
+    idx = 2;
+  }
+
+  len = _fstrlen(path);
+  remain = sizeof(fujifs_buf) - idx - 1;
+  if (len > remain)
+    len = remain;
+  _fmemmove(&fujifs_buf[idx], path, len);
+  fujifs_buf[idx + len] = 0;
   return;
 }
   
@@ -65,7 +77,7 @@ errcode fujifs_close_url()
   return fujifs_close();
 }
 
-errcode fujifs_open(const char *path, uint16_t mode)
+errcode fujifs_open(const char far *path, uint16_t mode)
 {
   int reply;
 
@@ -89,12 +101,13 @@ errcode fujifs_open(const char *path, uint16_t mode)
   if (mode == FUJIFS_WRITE)
     return 0;
 
-  if (status.errcode > NETWORK_SUCCESS && !status.length) {
-    // FIXME - for some reason FujiNet sends EOF when it really means FILE NOT FOUND
-    if (status.errcode == NETWORK_ERROR_END_OF_FILE)
-      status.errcode = NETWORK_ERROR_FILE_NOT_FOUND;
+  /* We haven't even read the file yet, it's not EOF */
+  if (status.errcode == NETWORK_ERROR_END_OF_FILE)
+    status.errcode = NETWORK_SUCCESS;
+  
+  if (status.errcode > NETWORK_SUCCESS && !status.length)
     return status.errcode;
-  }
+
 #if 0
   // FIXME - field doesn't work
   if (!status.connected)
@@ -168,13 +181,22 @@ size_t fujifs_tell()
   return status.length;
 }
 
-errcode fujifs_opendir()
+errcode fujifs_opendir(const char far *path)
 {
   errcode err;
+  uint16_t len;
 
+
+  /* FIXME - FujiNet seems to open in directory mode even if it's a
+             file, so append "/." to make it respect directory mode. */
+  ennify(path);
+  len = strlen(fujifs_buf);
+  if (fujifs_buf[len - 1] == '/')
+    fujifs_buf[len - 1] = 0;
+  strcat(fujifs_buf, "/.");
 
   cur_dir.position = cur_dir.length = 0;
-  return fujifs_open("", FUJIFS_DIRECTORY);
+  return fujifs_open(fujifs_buf, FUJIFS_DIRECTORY);
 }
 
 errcode fujifs_closedir()

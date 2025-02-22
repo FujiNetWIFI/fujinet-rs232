@@ -31,12 +31,12 @@ enum {
 // FIXME - this should probably return a handle to point to the network device which was used?
 extern errcode fujifs_open_url(const char *url, const char *user, const char *password);
 extern errcode fujifs_close_url();
-extern errcode fujifs_open(const char *path, uint16_t mode);
+extern errcode fujifs_open(const char far *path, uint16_t mode);
 extern errcode fujifs_close();
 extern size_t fujifs_read(uint8_t far *buf, size_t length);
 extern size_t fujifs_write(uint8_t far *buf, size_t length);
 extern size_t fujifs_tell();
-extern errcode fujifs_opendir();
+extern errcode fujifs_opendir(const char far *path);
 extern errcode fujifs_closedir();
 extern FN_DIRENT *fujifs_readdir();
 extern errcode fujifs_chdir();
