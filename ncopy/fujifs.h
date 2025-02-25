@@ -14,6 +14,7 @@
 #define strcasecmp stricmp
 #endif
 
+typedef uint8_t fujifs_handle;
 typedef int errcode;
 typedef struct {
   const char *name;
@@ -28,16 +29,16 @@ enum {
   FUJIFS_WRITE                    = 8,
 };
 
-// FIXME - this should probably return a handle to point to the network device which was used?
-extern errcode fujifs_open_url(const char *url, const char *user, const char *password);
-extern errcode fujifs_close_url();
-extern errcode fujifs_open(const char far *path, uint16_t mode);
-extern errcode fujifs_close();
-extern size_t fujifs_read(uint8_t far *buf, size_t length);
-extern size_t fujifs_write(uint8_t far *buf, size_t length);
-extern errcode fujifs_opendir(const char far *path);
-extern errcode fujifs_closedir();
-extern FN_DIRENT *fujifs_readdir();
+extern errcode fujifs_open_url(fujifs_handle far *handle, const char *url,
+			       const char *user, const char *password);
+extern errcode fujifs_close_url(fujifs_handle handle);
+extern errcode fujifs_open(fujifs_handle far *handle, const char far *path, uint16_t mode);
+extern errcode fujifs_close(fujifs_handle handle);
+extern size_t fujifs_read(fujifs_handle handle, uint8_t far *buf, size_t length);
+extern size_t fujifs_write(fujifs_handle handle, uint8_t far *buf, size_t length);
+extern errcode fujifs_opendir(fujifs_handle far *handle, const char far *path);
+extern errcode fujifs_closedir(fujifs_handle handle);
+extern FN_DIRENT *fujifs_readdir(fujifs_handle handle);
 extern errcode fujifs_chdir();
 
 #endif /* _FUJIFS_H */

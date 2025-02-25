@@ -31,6 +31,7 @@ int main(int argc, char *argv[])
   int drive_letter;
   const char *url;
   errcode err;
+  fujifs_handle host;
 
 
   if (argc < 2) {
@@ -48,7 +49,7 @@ int main(int argc, char *argv[])
   drive_num = drive_letter - 'A';
   url = argv[3];
 
-  err = fujifs_open_url(url, NULL, NULL);
+  err = fujifs_open_url(&host, url, NULL, NULL);
   if (err) {
     // Maybe authentication is needed?
     printf("User: ");
@@ -59,7 +60,7 @@ int main(int argc, char *argv[])
     fflush(stdout);
     get_password(&buf[128], 128);
 
-    err = fujifs_open_url(url, buf, &buf[128]);
+    err = fujifs_open_url(&host, url, buf, &buf[128]);
     if (err) {
       printf("Err: %i unable to open URL: %s\n", err, url);
       exit(1);
@@ -67,7 +68,7 @@ int main(int argc, char *argv[])
   }
 
   // Opened succesfully, we don't need it anymore
-  err = fujifs_close_url();
+  err = fujifs_close_url(host);
 
   // Tell FujiNet to remember it was open
   fujifs_chdir(url);

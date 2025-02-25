@@ -28,6 +28,7 @@ void main(int argc, char *argv[])
   errcode err;
   parsed cmd;
   int done = 0;
+  fujifs_handle host;
 
 
   if (argc < 2) {
@@ -35,7 +36,7 @@ void main(int argc, char *argv[])
     exit(1);
   }
   
-  err = fujifs_open_url(url, NULL, NULL);
+  err = fujifs_open_url(&host, url, NULL, NULL);
   if (err) {
     // Maybe authentication is needed?
     printf("User: ");
@@ -46,7 +47,7 @@ void main(int argc, char *argv[])
     fflush(stdout);
     get_password(&buf[128], 128);
 
-    err = fujifs_open_url(url, buf, &buf[128]);
+    err = fujifs_open_url(&host, url, buf, &buf[128]);
     if (err) {
       printf("Err: %i unable to open URL: %s\n", err, url);
       exit(1);
@@ -54,7 +55,7 @@ void main(int argc, char *argv[])
   }
 
   // Opened succesfully, we don't need it anymore
-  err = fujifs_close_url();
+  err = fujifs_close_url(host);
 
   // Tell FujiNet to remember it was open
   fujifs_chdir(url);
@@ -102,16 +103,17 @@ void print_dir()
   errcode err;
   size_t len;
   FN_DIRENT *ent;
+  fujifs_handle handle;
 
 
-  err = fujifs_opendir("");
+  err = fujifs_opendir(&handle, "");
   if (err) {
     printf("Unable to read directory\n");
     return;
   }
 
 #if 1
-  while ((ent = fujifs_readdir())) {
+  while ((ent = fujifs_readdir(handle))) {
     strftime(buf, sizeof(buf) - 1, "%Y-%b-%d %H:%M", &ent->mtime);
     if (ent->isdir)
       printf("%-*s %-*s %s\n", COL_NAME, ent->name, COL_SIZE, "<DIR>", buf);
@@ -128,7 +130,7 @@ void print_dir()
 #endif
   printf("\n");
 
-  fujifs_closedir();
+  fujifs_closedir(handle);
 
   return;
 }
@@ -139,6 +141,7 @@ void get_file(const char *source, const char *dest)
   errcode err;
   size_t len, lenw;
   off_t total;
+  fujifs_handle handle;
 
 
   if (!dest)
@@ -149,7 +152,7 @@ void get_file(const char *source, const char *dest)
     return;
   }
 
-  err = fujifs_open(source, FUJIFS_READ);
+  err = fujifs_open(&handle, source, FUJIFS_READ);
   if (err) {
     printf("Failed to open remote file: %s\n", source);
     fclose(file);
@@ -157,7 +160,7 @@ void get_file(const char *source, const char *dest)
   }
 
   total = 0;
-  while ((len = fujifs_read(buf, sizeof(buf)))) {
+  while ((len = fujifs_read(handle, buf, sizeof(buf)))) {
     total += len;
     lenw = fwrite(buf, 1, len, file);
     printf("%10lu bytes transferred.\r", total);
@@ -169,7 +172,7 @@ void get_file(const char *source, const char *dest)
   }
   printf("\n");
 
-  fujifs_close();
+  fujifs_close(handle);
   fclose(file);
   return;
 }
@@ -180,6 +183,7 @@ void put_file(const char *source, const char *dest)
   errcode err;
   size_t len, lenw;
   off_t total;
+  fujifs_handle handle;
 
 
   if (!dest)
@@ -190,7 +194,7 @@ void put_file(const char *source, const char *dest)
     return;
   }
 
-  err = fujifs_open(dest, FUJIFS_WRITE);
+  err = fujifs_open(&handle, dest, FUJIFS_WRITE);
   if (err) {
     printf("Failed to open remote file: %s\n", dest);
     fclose(file);
@@ -199,7 +203,7 @@ void put_file(const char *source, const char *dest)
 
   total = 0;
   while ((len = fread(buf, 1, sizeof(buf), file))) {
-    lenw = fujifs_write(buf, len);
+    lenw = fujifs_write(handle, buf, len);
     total += lenw;
     printf("%10lu bytes transferred.\r", total);
     
@@ -210,7 +214,7 @@ void put_file(const char *source, const char *dest)
   }
   printf("\n");
 
-  fujifs_close();
+  fujifs_close(handle);
   fclose(file);
   return;
 }

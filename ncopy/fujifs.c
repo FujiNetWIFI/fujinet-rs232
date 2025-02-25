@@ -13,9 +13,11 @@
 #include "../sys/print.h"
 
 // FIXME - find available network device
-#define NETDEV DEVICEID_FN_NETWORK
-#define OPEN_SIZE 256
-#define DIR_DELIM " \r\n"
+#define NETDEV(x)	(DEVICEID_FN_NETWORK + x - 1)
+#define NETDEV_TOTAL    (DEVICEID_FN_NETWORK_LAST - DEVICEID_FN_NETWORK + 1)
+#define NETDEV_PREFIX	"N0:"
+#define OPEN_SIZE       256
+#define DIR_DELIM       " \r\n"
 
 struct {
   unsigned short length;
@@ -26,21 +28,28 @@ struct {
 typedef struct {
   size_t position, length;
 } FN_DIR;
-  
+
+static uint8_t fujifs_in_use[NETDEV_TOTAL];
 static uint8_t fujifs_buf[OPEN_SIZE];
+#warning FIXME put cur_dir into handles
 static FN_DIR cur_dir;
+static char fujifs_did_init = 0;
 
 // Copy path to fujifs_buf and make sure it has N: prefix
-void ennify(const char far *path)
+void ennify(int devnum, const char far *path)
 {
   uint16_t idx, len, remain;
+  int has_prefix;
 
 
   idx = 0;
-  // FIXME - handle N1: N2: etc.
-  if (toupper(path[0]) != 'N' || path[1] != ':') {
-    memcpy(fujifs_buf, "N:", 2);
-    idx = 2;
+  has_prefix = toupper(path[0]) == 'N'
+    && ((path[1] == ':' && devnum == 1)
+	|| (path[2] == ':' && path[1] == '0' + devnum));
+  if (!has_prefix) {
+    idx = strlen(NETDEV_PREFIX);
+    memcpy(fujifs_buf, NETDEV_PREFIX, idx);
+    fujifs_buf[1] = '0' + devnum;
   }
 
   len = _fstrlen(path);
@@ -51,47 +60,87 @@ void ennify(const char far *path)
   fujifs_buf[idx + len] = 0;
   return;
 }
-  
-errcode fujifs_open_url(const char *url, const char *user, const char *password)
+
+fujifs_handle fujifs_find_handle()
+{
+  int idx;
+
+
+  if (!fujifs_did_init) {
+    memset(fujifs_in_use, 0, sizeof(fujifs_in_use));
+    fujifs_did_init = 1;
+  }
+
+  for (idx = 0; idx < NETDEV_TOTAL; idx++) {
+    if (!fujifs_in_use[idx]) {
+      fujifs_in_use[idx] = 1;
+      return idx + 1;
+    }
+  }
+
+  return 0;
+}
+
+errcode fujifs_open_url(fujifs_handle far *handle, const char *url,
+			const char *user, const char *password)
 {
   int reply;
+  fujifs_handle temp;
 
+
+  temp = fujifs_find_handle();
+  if (!temp)
+    return NETWORK_ERROR_NO_DEVICE_AVAILABLE;
 
   // User/pass is "sticky" and needs to be set/reset on open
   memset(fujifs_buf, 0, sizeof(fujifs_buf));
+
+  // FIXME - will CMD_USERNAME or CMD_PASSWORD close or alter open stream?
   if (user)
     strcpy(fujifs_buf, user);
-  reply = fujiF5_write(NETDEV, CMD_USERNAME, 0, 0, &fujifs_buf, OPEN_SIZE);
+  reply = fujiF5_write(NETDEV(temp), CMD_USERNAME, 0, 0, fujifs_buf, OPEN_SIZE);
   // FIXME - check err
+
   memset(fujifs_buf, 0, sizeof(fujifs_buf));
   if (password)
     strcpy(fujifs_buf, password);
-  reply = fujiF5_write(NETDEV, CMD_PASSWORD, 0, 0, &fujifs_buf, OPEN_SIZE);
+  reply = fujiF5_write(NETDEV(temp), CMD_PASSWORD, 0, 0, fujifs_buf, OPEN_SIZE);
   // FIXME - check err
-  
-  return fujifs_open(url, FUJIFS_DIRECTORY);
+
+  // This wasn't an open commend so no need to close, just mark it available
+  fujifs_in_use[temp - 1] = 0;
+
+  return fujifs_open(handle, url, FUJIFS_DIRECTORY);
 }
 
-errcode fujifs_close_url()
+errcode fujifs_close_url(fujifs_handle handle)
 {
-  return fujifs_close();
+  return fujifs_close(handle);
 }
 
-errcode fujifs_open(const char far *path, uint16_t mode)
+errcode fujifs_open(fujifs_handle far *handle, const char far *path, uint16_t mode)
 {
   int reply;
 
 
-  ennify(path);
-  reply = fujiF5_write(NETDEV, CMD_OPEN, mode, 0, &fujifs_buf, OPEN_SIZE);
+  *handle = fujifs_find_handle();
+  if (!*handle)
+    return NETWORK_ERROR_NO_DEVICE_AVAILABLE;
+
+  ennify(*handle, path);
+  reply = fujiF5_write(NETDEV(*handle), CMD_OPEN, mode, 0, fujifs_buf, OPEN_SIZE);
+#if 0
   if (reply != REPLY_COMPLETE)
     printf("FUJIFS_OPEN OPEN REPLY: 0x%02x\n", reply);
   // FIXME - check err
+#endif
 
-  reply = fujiF5_read(NETDEV, CMD_STATUS, 0, 0, &status, sizeof(status));
+  reply = fujiF5_read(NETDEV(*handle), CMD_STATUS, 0, 0, &status, sizeof(status));
+#if 0
   if (reply != REPLY_COMPLETE)
     printf("FUJIFS_OPEN STATUS REPLY: 0x%02x\n", reply);
   // FIXME - check err
+#endif
 
 #if 0
   printf("FN STATUS: len %i  con %i  err %i\n",
@@ -104,7 +153,7 @@ errcode fujifs_open(const char far *path, uint16_t mode)
   /* We haven't even read the file yet, it's not EOF */
   if (status.errcode == NETWORK_ERROR_END_OF_FILE)
     status.errcode = NETWORK_SUCCESS;
-  
+
   if (status.errcode > NETWORK_SUCCESS && !status.length)
     return status.errcode;
 
@@ -113,27 +162,36 @@ errcode fujifs_open(const char far *path, uint16_t mode)
   if (!status.connected)
     return -1;
 #endif
-  
+
   return 0;
 }
 
-errcode fujifs_close()
+errcode fujifs_close(fujifs_handle handle)
 {
-  fujiF5_none(NETDEV, CMD_CLOSE, 0, 0, NULL, 0);
+  if (handle < 1 || handle >= NETDEV_TOTAL || !fujifs_in_use[handle - 1])
+    return NETWORK_ERROR_NOT_CONNECTED;
+
+  fujiF5_none(NETDEV(handle), CMD_CLOSE, 0, 0, NULL, 0);
+  fujifs_in_use[handle - 1] = 0;
   return 0;
 }
 
 // Returns number of bytes read
-size_t fujifs_read(uint8_t far *buf, size_t length)
+size_t fujifs_read(fujifs_handle handle, uint8_t far *buf, size_t length)
 {
   int reply;
 
 
+  if (handle < 1 || handle >= NETDEV_TOTAL)
+    return 0;
+
   // Check how many bytes are available
-  reply = fujiF5_read(NETDEV, CMD_STATUS, 0, 0, &status, sizeof(status));
+  reply = fujiF5_read(NETDEV(handle), CMD_STATUS, 0, 0, &status, sizeof(status));
+#if 0
   if (reply != REPLY_COMPLETE)
     printf("FUJIFS_READ STATUS REPLY: 0x%02x\n", reply);
   // FIXME - check err
+#endif
 
 #if 0
   printf("FN STATUS: len %i  con %i  err %i\n",
@@ -153,38 +211,51 @@ size_t fujifs_read(uint8_t far *buf, size_t length)
 }
 
 // Returns number of bytes written
-size_t fujifs_write(uint8_t far *buf, size_t length)
+size_t fujifs_write(fujifs_handle handle, uint8_t far *buf, size_t length)
 {
   int reply;
 
 
-  reply = fujiF5_write(DEVICEID_FN_NETWORK, CMD_WRITE, length, 0, buf, length);
+  if (handle < 1 || handle >= NETDEV_TOTAL)
+    return 0;
+
+  reply = fujiF5_write(NETDEV(handle), CMD_WRITE, length, 0, buf, length);
   if (reply != REPLY_COMPLETE)
     return 0;
   return length;
 }
 
-errcode fujifs_opendir(const char far *path)
+errcode fujifs_opendir(fujifs_handle far *handle, const char far *path)
 {
   errcode err;
   uint16_t len;
+  fujifs_handle temp;
 
 
   /* FIXME - FujiNet seems to open in directory mode even if it's a
              file, so append "/." to make it respect directory mode. */
-  ennify(path);
+
+  // Figure out which N: device will be used and stick that prefix on
+  temp = fujifs_find_handle();
+  if (!temp)
+    return NETWORK_ERROR_NO_DEVICE_AVAILABLE;
+
+  ennify(temp, path);
+  fujifs_in_use[temp - 1] = 0;
+
   len = strlen(fujifs_buf);
   if (fujifs_buf[len - 1] == '/')
     fujifs_buf[len - 1] = 0;
   strcat(fujifs_buf, "/.");
 
   cur_dir.position = cur_dir.length = 0;
-  return fujifs_open(fujifs_buf, FUJIFS_DIRECTORY);
+  // FIXME - check if open failed and return NETWORK_ERROR_NOT_A_DIRECTORY
+  return fujifs_open(handle, fujifs_buf, FUJIFS_DIRECTORY);
 }
 
-errcode fujifs_closedir()
+errcode fujifs_closedir(fujifs_handle handle)
 {
-  fujiF5_none(NETDEV, CMD_CLOSE, 0, 0, NULL, 0);
+  fujifs_close(handle);
   return 0;
 }
 
@@ -221,7 +292,7 @@ char *fujifs_strtok(char *str, const char *delim)
   return str;
 }
 
-FN_DIRENT *fujifs_readdir()
+FN_DIRENT *fujifs_readdir(fujifs_handle handle)
 {
   size_t len;
   static FN_DIRENT ent;
@@ -232,7 +303,7 @@ FN_DIRENT *fujifs_readdir()
 
   // Refill buffer if it's empty
   if (cur_dir.position >= cur_dir.length) {
-    cur_dir.length = fujifs_read(fujifs_buf, sizeof(fujifs_buf));
+    cur_dir.length = fujifs_read(handle, fujifs_buf, sizeof(fujifs_buf));
     cur_dir.position = 0;
   }
 
@@ -250,7 +321,7 @@ FN_DIRENT *fujifs_readdir()
   if (idx == cur_dir.length) {
     len1 = cur_dir.length - cur_dir.position;
     memmove(fujifs_buf, &fujifs_buf[cur_dir.position], len1);
-    len2 = fujifs_read(&fujifs_buf[len1], sizeof(fujifs_buf) - len1);
+    len2 = fujifs_read(handle, &fujifs_buf[len1], sizeof(fujifs_buf) - len1);
     if (!len2)
       return NULL;
     cur_dir.position = 0;
@@ -285,7 +356,7 @@ FN_DIRENT *fujifs_readdir()
 
   // get date
   cptr1 = fujifs_strtok(NULL, DIR_DELIM);
-  
+
   // get time
   cptr2 = fujifs_strtok(NULL, DIR_DELIM);
 
@@ -315,12 +386,22 @@ FN_DIRENT *fujifs_readdir()
 errcode fujifs_chdir(const char *path)
 {
   int reply;
+  fujifs_handle temp;
 
 
-  ennify(path);
-  reply = fujiF5_write(NETDEV, CMD_CHDIR, 0x0000, 0, &fujifs_buf, OPEN_SIZE);
+  temp = fujifs_find_handle();
+  if (!temp)
+    return NETWORK_ERROR_NO_DEVICE_AVAILABLE;
+
+  ennify(temp, path);
+  reply = fujiF5_write(NETDEV(temp), CMD_CHDIR, 0x0000, 0, fujifs_buf, OPEN_SIZE);
+#if 0
   if (reply != REPLY_COMPLETE)
     printf("FUJIFS_CHDIR CHDIR REPLY: 0x%02x\n", reply);
   // FIXME - check err
+#endif
+
+  // This wasn't an open commend so no need to close, just mark it available
+  fujifs_in_use[temp - 1] = 0;
   return 0;
 }
