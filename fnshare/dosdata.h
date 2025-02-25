@@ -19,6 +19,12 @@ enum {
   MODE_INHERITANCE      = 0x80,
 };
 
+enum {
+  OPEXT_OPENED          = 1,
+  OPEXT_CREATED         = 2,
+  OPEXT_TRUNCATED       = 3,
+};
+
 /* Macro to get value from DOS structs which automatically handles checking _osmajor */
 #define DOS_STRUCT_VALUE(type, var, field) \
   ((_osmajor == 3) ? ((type##_V3)(var))->field : ((type##_V4)(var))->field)
@@ -54,7 +60,7 @@ typedef struct {
   uint8_t _reserved1[10];
   uint16_t time, date;
   uint16_t start_sector;
-  long size;
+  uint32_t size;
 } DIRREC, far *DIRREC_PTR;
 
 /* Swappable DOS Area - DOS VERSION 3.xx */
@@ -151,9 +157,10 @@ typedef struct {
   uint16_t dev_info_word;
   uint8_t far *dev_drvr_ptr;
   uint16_t start_sector;
-  uint32_t file_time;
-  int32_t file_size;
-  int32_t file_pos;
+  uint16_t file_time;
+  uint16_t file_date;
+  uint32_t file_size;
+  uint32_t file_pos;
   uint16_t rel_sector;
   uint16_t abs_sector;
   uint16_t dir_sector;

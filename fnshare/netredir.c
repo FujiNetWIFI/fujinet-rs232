@@ -43,7 +43,7 @@ char *undosify_path(const char far *path)
     else // FIXME - FujiNet should be handling the case fixing
       temp_path[idx] = tolower(temp_path[idx]);
   }
-  
+
   return temp_path;
 }
 
@@ -61,7 +61,7 @@ int contains_wildcards(char far *path)
 int filename_match(char far *pattern, char far *filename)
 {
   int idx, jdx;
-  
+
 
 #if 0
   consolef("COMPARING \"%ls\" \"%ls\"\n", pattern, filename);
@@ -74,10 +74,10 @@ int filename_match(char far *pattern, char far *filename)
 
     if (pattern[idx] == '?') {
       if (!filename[idx] || filename[idx] == '.')
-	break; // '?' matches even if filename is shorter
+        break; // '?' matches even if filename is shorter
       continue;
     }
-    
+
     if (pattern[idx] != toupper(filename[idx])) {
 #if 0
       consolef("POS MISMATCH: %c != %c\n", pattern[idx], toupper(filename[idx]));
@@ -106,7 +106,7 @@ int filename_match(char far *pattern, char far *filename)
 
     if (pattern[idx] == '?') {
       if (!filename[jdx])
-	break; // '?' matches even if extension is shorter
+        break; // '?' matches even if extension is shorter
       continue;
     }
 
@@ -161,7 +161,7 @@ int findnext(SRCHREC_PTR search)
       ;
   }
 #endif
-  
+
   search->drive_num = (drive_num + 1) | 0x80;
   _fmemmove(search->pattern, pattern, sizeof(search->pattern));
   search->attr_mask = search_attr;
@@ -191,7 +191,6 @@ int findnext(SRCHREC_PTR search)
 
   dos_entry->size = ent->size;
 
-
   return DOSERR_NONE;
 }
 
@@ -206,7 +205,7 @@ int findfirst(const char far *path, SRCHREC_PTR search)
   //consolef("PATH: %ls\n", DOS_SDA_VALUE(path1));
   // FIXME - make these arguments instead of accessing globals
   dos_entry = DOS_SDA_POINTER(dirrec);
-  pattern = DOS_SDA_POINTER(fcb_name[0]);
+  pattern = DOS_SDA_VALUE(fcb_name);
   search_attr = DOS_SDA_VALUE(srch_attr);
 
   //consolef("FF PATTERN: 0x%02x %ls\n", search_attr, pattern);
@@ -273,22 +272,59 @@ int open_extended(SFTREC_PTR sft)
   int err;
 
 
-  mode = DOS_SDA_V4_VALUE(mode_2E);
-  mode &= ~MODE_DENYNONE;
+  mode = DOS_SDA_V4_VALUE(mode_2E) & 0x7F;
 
   // FIXME - if not opening read-only then error out for now
-  if (mode) {
+  if (mode & ~MODE_DENYNONE) {
     consolef("FN OPEN_EXTENDED Unsupported mode 0x%04x\n", mode);
     return DOSERR_DISK_WRITE_PROTECTED;
   }
-  
+
   path = undosify_path(DOS_SDA_VALUE(path1));
   action = DOS_SDA_V4_VALUE(action_2E);
   attr = DOS_SDA_V4_VALUE(attr_2E);
 #if 0
   consolef("OPEN EXT: mode 0x%04x action 0x%04x attr 0x%04x \"%s\"\n",
-	   mode, action, attr, path);
+           mode, action, attr, path);
 #endif
+
+  // FIXME - using findfirst() to stat the file. Requires reading the entire directory.
+  {
+    DIRREC_PTR dos_entry;
+
+
+    //consolef("FCB/PATTERN %ls\n", DOS_SDA_VALUE(fcb_name));
+
+    _fmemcpy(sft->file_name, DOS_SDA_VALUE(fcb_name), DOS_FILENAME_LEN);
+    findfirst(DOS_SDA_VALUE(path1), DOS_SDA_POINTER(srchrec));
+    dos_entry = DOS_SDA_POINTER(dirrec);
+
+    sft->file_pos = 0;
+
+    sft->file_attr = dos_entry->attr;
+    sft->file_time = dos_entry->time;
+    sft->file_date = dos_entry->date;
+    sft->file_size = dos_entry->size;
+
+    sft->dev_drvr_ptr = NULL;
+    sft->start_sector = 20;
+    sft->dir_sector = 0;
+    sft->rel_sector = sft->abs_sector = 0xffff;
+    sft->dev_drvr_ptr = 0;
+
+    sft->open_mode = mode;
+    // FIXME - use constants
+    if (sft->open_mode & 0x8000)
+      /* File is being opened via FCB */
+      sft->open_mode |= 0x00F0;
+    else
+      sft->open_mode &= 0x000F;
+
+    // FIXME - use constant
+    sft->dev_info_word = 0x8040 | drive_num; // Mark file as being on network drive
+
+    sft->dir_entry_no = 0xff;
+  }
 
   // FIXME - how to open multiple files?
   err = fujifs_open(path, FUJIFS_READ);
@@ -299,17 +335,8 @@ int open_extended(SFTREC_PTR sft)
   else if (err) {
     consolef("FN OPEN_EXTENDED fail %i\n", err);
     return DOSERR_READ_FAULT;
-  } 
+  }
 
-  _fmemset(sft, 0, sizeof(*sft));
-  _fmemcpy(sft->file_name, DOS_SDA_VALUE(fcb_name), DOS_FILENAME_LEN);
-  sft->file_attr = 0; // FIXME - stat the file
-  sft->file_time = 0; // FIXME - stat the file
-  sft->file_size = fujifs_tell();
-
-  // FIXME - use constant
-  sft->dev_info_word = 0x8040 | drive_num; // Mark file as being on network drive
-  
   return DOSERR_NONE;
 }
 
@@ -319,15 +346,15 @@ int close_file(SFTREC_PTR sft)
   return DOSERR_NONE;
 }
 
-int read_file(SFTREC_PTR sft, uint16_t far *length)
+int read_file(SFTREC_PTR sft, uint16_t far *len_ptr)
 {
   uint16_t rlen;
 
 
-  rlen = fujifs_read(DOS_SDA_VALUE(current_dta), *length);
+  rlen = fujifs_read(DOS_SDA_VALUE(current_dta), *len_ptr);
   sft->file_pos += rlen;
-  *length = rlen;
-  
+  *len_ptr = rlen;
+
   return DOSERR_NONE;
 }
 
@@ -340,12 +367,12 @@ void __interrupt redirector(union INTPACK regs)
 
   func = regs.h.ah;
   subfunc = regs.h.al;
-  //  consolef("FN REDIR 0x%02x/%02x\n", func, subfunc);
-  //consolef("");
 
   if (func != REDIRECTOR_FUNC) { // Not our redirector call, pass it down the chain
     goto not_us;
   }
+
+  //consolef("FN REDIR 0x%02x/%02x\n", func, subfunc);
 
   if (subfunc == SUBF_INQUIRY) {
     regs.x.ax = 0x00ff;
@@ -373,10 +400,7 @@ void __interrupt redirector(union INTPACK regs)
     result = chdir();
     break;
 
-  case SUBF_REDIRPRINTER:
-    result = 0x16;
-    break;
-
+  case SUBF_OPENEXIST:
   case SUBF_OPENEXTENDED:
     result = open_extended(MK_FP(regs.x.es, regs.x.di));
     break;
@@ -384,7 +408,7 @@ void __interrupt redirector(union INTPACK regs)
   case SUBF_CLOSE:
     result = close_file(MK_FP(regs.x.es, regs.x.di));
     break;
-    
+
   case SUBF_READ:
     result = read_file(MK_FP(regs.x.es, regs.x.di), &regs.x.cx);
     break;
@@ -393,15 +417,21 @@ void __interrupt redirector(union INTPACK regs)
     // FIXME - FujiNet does not support yet
     result = DOSERR_UNKNOWN_COMMAND;
     break;
-    
+
+  case SUBF_QUALIFYPATH:
+  case SUBF_REDIRPRINTER:
+    goto not_us;
+
   default:
-    consolef("FN REDIRECT SUB 0x%02x\n", subfunc);
+    consolef("FN REDIR unimplemented function 0x%02x\n", subfunc);
     result = DOSERR_UNKNOWN_COMMAND;
     break;
   }
 
+  //consolef("FN REDIR 0x%02x/%02x  RESULT: 0x%04x\n", func, subfunc, result);
+
   regs.x.ax = result;
-  if (result)
+  if (regs.x.ax)
     regs.x.flags |= INTR_CF;
   else
     regs.x.flags &= ~INTR_CF;
@@ -410,4 +440,3 @@ void __interrupt redirector(union INTPACK regs)
  not_us:
   _chain_intr(old_int2f);
 }
-
