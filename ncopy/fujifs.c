@@ -12,10 +12,16 @@
 
 #include "../sys/print.h"
 
+#undef NETDEV_NEEDS_DIGIT
+
 // FIXME - find available network device
 #define NETDEV(x)	(DEVICEID_FN_NETWORK + x - 1)
 #define NETDEV_TOTAL    (DEVICEID_FN_NETWORK_LAST - DEVICEID_FN_NETWORK + 1)
+#ifdef NETDEV_NEEDS_DIGIT
 #define NETDEV_PREFIX	"N0:"
+#else
+#define NETDEV_PREFIX	"N:"
+#endif
 #define OPEN_SIZE       256
 #define DIR_DELIM       " \r\n"
 
@@ -43,14 +49,22 @@ void ennify(int devnum, const char far *path)
 
 
   idx = 0;
+#if NETDEV_NEEDS_DIGIT
   has_prefix = toupper(path[0]) == 'N'
     && ((path[1] == ':' && devnum == 1)
 	|| (path[2] == ':' && path[1] == '0' + devnum));
   if (!has_prefix) {
-    idx = strlen(NETDEV_PREFIX);
+    idx = sizeof(NETDEV_PREFIX) - 1;
     memcpy(fujifs_buf, NETDEV_PREFIX, idx);
     fujifs_buf[1] = '0' + devnum;
   }
+#else
+  has_prefix = toupper(path[0]) == 'N' && path[1] == ':';
+  if (!has_prefix) {
+    idx = sizeof(NETDEV_PREFIX) - 1;
+    memcpy(fujifs_buf, NETDEV_PREFIX, idx);
+  }
+#endif
 
   len = _fstrlen(path);
   remain = sizeof(fujifs_buf) - idx - 1;
@@ -400,6 +414,8 @@ errcode fujifs_chdir(const char *path)
     printf("FUJIFS_CHDIR CHDIR REPLY: 0x%02x\n", reply);
   // FIXME - check err
 #endif
+
+  // FIXME - invalidate all other network drives that have us as parent
 
   // This wasn't an open commend so no need to close, just mark it available
   fujifs_in_use[temp - 1] = 0;
