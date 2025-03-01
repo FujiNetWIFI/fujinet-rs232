@@ -4,6 +4,7 @@
 #ifndef _FUJIFS_H
 #define _FUJIFS_H
 
+#include <fujicom.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/types.h> // for off_t

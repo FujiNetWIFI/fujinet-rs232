@@ -63,10 +63,6 @@ int filename_match(char far *pattern, char far *filename)
   int idx, jdx;
 
 
-#if 0
-  consolef("COMPARING \"%ls\" \"%ls\"\n", pattern, filename);
-#endif
-
   // Compare the name part (first 8 characters in DOS)
   for (idx = 0; idx < 8; idx++) {
     if (pattern[idx] == ' ')
@@ -78,21 +74,13 @@ int filename_match(char far *pattern, char far *filename)
       continue;
     }
 
-    if (pattern[idx] != toupper(filename[idx])) {
-#if 0
-      consolef("POS MISMATCH: %c != %c\n", pattern[idx], toupper(filename[idx]));
-#endif
+    if (pattern[idx] != toupper(filename[idx]))
       return 0;
-    }
   }
 
   // If disk name still has characters before '.', mismatch
-  if (filename[idx] && filename[idx] != '.') {
-#if 0
-    consolef("FILENAME TOO LONG\n");
-#endif
+  if (filename[idx] && filename[idx] != '.')
     return 0;
-  }
 
   // Skip '.' in disk name if present
   if (filename[idx] == '.')
@@ -110,20 +98,10 @@ int filename_match(char far *pattern, char far *filename)
       continue;
     }
 
-    if (pattern[idx] != toupper(filename[jdx])) {
-#if 0
-      consolef("EXT MISMATCH: %c != %c\n", pattern[idx], toupper(filename[jdx]));
-#endif
+    if (pattern[idx] != toupper(filename[jdx]))
       return 0;
-    }
   }
 
-#if 0
-  if (filename[jdx]) {
-    consolef("CHARS REMAINING %i %i\n", idx, jdx);
-    return 0;
-  }
-#endif
   return !filename[jdx];
 }
 
@@ -183,9 +161,11 @@ int findnext(SRCHREC_PTR search)
   }
 #endif
 
+#if 0
   search->drive_num = (drive_num + 1) | 0x80;
   _fmemmove(search->pattern, pattern, sizeof(search->pattern));
   search->attr_mask = search_attr;
+#endif
 
   _fmemset(dos_entry->name, ' ', sizeof(search->pattern));
   dot = strchr(ent->name, '.');
@@ -342,7 +322,6 @@ int open_extended(SFTREC_PTR sft)
     sft->dir_entry_no = 0xff;
   }
 
-  // FIXME - how to open multiple files?
   err = fujifs_open(&handle, path, FUJIFS_READ);
   if (err == NETWORK_ERROR_FILE_NOT_FOUND)
     return DOSERR_FILE_NOT_FOUND;
@@ -368,13 +347,12 @@ int read_file(SFTREC_PTR sft, uint16_t far *len_ptr)
 
 
   rlen = fujifs_read(sft->start_sector, DOS_SDA_VALUE(current_dta), *len_ptr);
+  *len_ptr = rlen;
 
   // These fields appear to only be for our own use, DOS doesn't look at them
   sft->file_pos += rlen;
   sft->rel_sector = (sft->file_pos + 511) / 512;
   sft->abs_sector = sft->rel_sector;
-
-  *len_ptr = rlen;
 
   return DOSERR_NONE;
 }

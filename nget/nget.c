@@ -78,7 +78,7 @@ int nget(char *src, char *dst)
 	// FIXME - define constants:
 	//r.h.dl   = 0x04; /* READ ONLY */
 	//r.h.dh   = 0x00; /* NO TRANSLATION */
-	fujiF5_write(DEVICEID_FN_NETWORK, CMD_OPEN, 0x0004, 0, &url, sizeof(url));
+	fujiF5_write(DEVICEID_FN_NETWORK, CMD_OPEN, 0x0004, 0, url, sizeof(url));
 
  	delay(10);
 
