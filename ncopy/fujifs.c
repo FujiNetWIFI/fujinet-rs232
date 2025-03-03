@@ -49,7 +49,7 @@ void ennify(int devnum, const char far *path)
 
 
   idx = 0;
-#if NETDEV_NEEDS_DIGIT
+#ifdef NETDEV_NEEDS_DIGIT
   has_prefix = toupper(path[0]) == 'N'
     && ((path[1] == ':' && devnum == 1)
 	|| (path[2] == ':' && path[1] == '0' + devnum));
@@ -168,8 +168,10 @@ errcode fujifs_open(fujifs_handle far *handle, const char far *path, uint16_t mo
   if (status.errcode == NETWORK_ERROR_END_OF_FILE)
     status.errcode = NETWORK_SUCCESS;
 
-  if (status.errcode > NETWORK_SUCCESS && !status.length)
+  if (status.errcode > NETWORK_SUCCESS && !status.length) {
+    fujifs_in_use[*handle - 1] = 0;
     return status.errcode;
+  }
 
 #if 0
   // FIXME - field doesn't work
@@ -218,7 +220,7 @@ size_t fujifs_read(fujifs_handle handle, uint8_t far *buf, size_t length)
   if (length > status.length)
     length = status.length;
 
-  reply = fujiF5_read(DEVICEID_FN_NETWORK, CMD_READ, length, 0, buf, length);
+  reply = fujiF5_read(NETDEV(handle), CMD_READ, length, 0, buf, length);
   if (reply != REPLY_COMPLETE)
     return 0;
   return length;
@@ -318,6 +320,8 @@ FN_DIRENT *fujifs_readdir(fujifs_handle handle)
   // Refill buffer if it's empty
   if (cur_dir.position >= cur_dir.length) {
     cur_dir.length = fujifs_read(handle, fujifs_buf, sizeof(fujifs_buf));
+    if (!cur_dir.length)
+      return NULL;
     cur_dir.position = 0;
   }
 
@@ -336,6 +340,8 @@ FN_DIRENT *fujifs_readdir(fujifs_handle handle)
     len1 = cur_dir.length - cur_dir.position;
     memmove(fujifs_buf, &fujifs_buf[cur_dir.position], len1);
     len2 = fujifs_read(handle, &fujifs_buf[len1], sizeof(fujifs_buf) - len1);
+    if (!len2)
+      return NULL;
     if (!len2)
       return NULL;
     cur_dir.position = 0;
