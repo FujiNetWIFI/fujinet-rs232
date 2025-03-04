@@ -2,6 +2,7 @@
 #define _NETREDIR_H
 
 #include "dosdata.h"
+#include "fujifs.h"
 #include <stdint.h>
 
 #define DOS_INT_REDIR   0x2F
@@ -40,7 +41,11 @@ enum {
 
 extern void interrupt far (*old_int2f)();
 extern void far *sda_ptr;
-extern uint8_t drive_num;
+extern uint8_t fn_drive_num;
+extern fujifs_handle fn_host;
+extern char *fn_volume;
+extern char fn_cwd[];
+
 #if 0
 extern char fuji_cwd[];
 #endif

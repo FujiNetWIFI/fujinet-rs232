@@ -93,6 +93,7 @@ enum {
 
 enum {
   CMD_CHDIR                     = 0x2c,
+  CMD_GETCWD                    = 0x30,
   CMD_OPEN                      = 'O',
   CMD_CLOSE                     = 'C',
   CMD_READ                      = 'R',

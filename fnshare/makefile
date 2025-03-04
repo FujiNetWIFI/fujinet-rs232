@@ -2,7 +2,7 @@ TARGET  = fnshare.exe
 AS      = wasm -q
 ASFLAGS = -0 -mt -bt=DOS
 CC      = wcc -q
-CFLAGS  = -0 -bt=dos -ms -I../fujicom -osh -zu $(CPPFLAGS)
+CFLAGS  = -0 -bt=dos -ms -I../fujicom -I../ncopy -osh -zu $(CPPFLAGS)
 LD	= wlink OPTION quiet
 LDFLAGS = &
 	SYSTEM dos &

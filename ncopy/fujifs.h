@@ -30,16 +30,18 @@ enum {
   FUJIFS_WRITE                    = 8,
 };
 
-extern errcode fujifs_open_url(fujifs_handle far *handle, const char *url,
+extern errcode fujifs_open_url(fujifs_handle far *host_handle, const char *url,
 			       const char *user, const char *password);
-extern errcode fujifs_close_url(fujifs_handle handle);
-extern errcode fujifs_open(fujifs_handle far *handle, const char far *path, uint16_t mode);
+extern errcode fujifs_close_url(fujifs_handle host_handle);
+extern errcode fujifs_open(fujifs_handle host_handle, fujifs_handle far *file_handle,
+			   const char far *path, uint16_t mode);
 extern errcode fujifs_close(fujifs_handle handle);
 extern size_t fujifs_read(fujifs_handle handle, uint8_t far *buf, size_t length);
 extern size_t fujifs_write(fujifs_handle handle, uint8_t far *buf, size_t length);
-extern errcode fujifs_opendir(fujifs_handle far *handle, const char far *path);
+extern errcode fujifs_opendir(fujifs_handle host_handle, fujifs_handle far *dir_handle,
+			      const char far *path);
 extern errcode fujifs_closedir(fujifs_handle handle);
 extern FN_DIRENT *fujifs_readdir(fujifs_handle handle);
-extern errcode fujifs_chdir();
+extern errcode fujifs_chdir(fujifs_handle host_handle, const char far *path);
 
 #endif /* _FUJIFS_H */

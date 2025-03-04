@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define DOS_MAX_PATHLEN         128
+#define DOS_MAX_PATHLEN         256
 #define DOS_FILENAME_LEN        11
 
 enum {
@@ -49,7 +49,8 @@ typedef struct {
   char pattern[11];
   uint8_t attr_mask;
   uint16_t sequence;
-  uint16_t sector;
+  //uint16_t sector;
+  uint16_t fndir_handle;
   uint8_t _reserved1[4];
 } SRCHREC, far *SRCHREC_PTR;
 
@@ -156,7 +157,8 @@ typedef struct {
   uint8_t file_attr;
   uint16_t dev_info_word;
   uint8_t far *dev_drvr_ptr;
-  uint16_t start_sector;
+  //uint16_t start_sector;
+  uint16_t fnfile_handle;
   uint16_t file_time;
   uint16_t file_date;
   uint32_t file_size;

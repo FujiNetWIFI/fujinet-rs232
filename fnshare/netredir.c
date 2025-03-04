@@ -1,8 +1,7 @@
 #include "netredir.h"
 #include "dosdata.h"
 #include "doserr.h"
-#include "fujicom.h"
-#include "../ncopy/fujifs.h"
+#include "fujifs.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,11 +16,16 @@
 /* Get pointer to field */
 #define DOS_SDA_POINTER(x) DOS_STRUCT_POINTER(SDA_PTR, sda_ptr, x)
 
+#define FNDIR_NOTOPEN 0
+
 void interrupt far (*old_int2f)();
 void far *sda_ptr;
-uint8_t drive_num;
+uint8_t fn_drive_num;
+fujifs_handle fn_host;
+char *fn_volume;
+char fn_cwd[DOS_MAX_PATHLEN+1];
 
-static char temp_path[DOS_MAX_PATHLEN];
+static char temp_path[DOS_MAX_PATHLEN+1];
 
 typedef uint16_t(*redirectFunction_t)(void far *parms);
 
@@ -42,6 +46,37 @@ char *undosify_path(const char far *path)
       temp_path[idx] = '/';
     else // FIXME - FujiNet should be handling the case fixing
       temp_path[idx] = tolower(temp_path[idx]);
+  }
+
+  return temp_path;
+}
+
+char *path_with_volume(char far *path)
+{
+  uint16_t len1, len2 = 0, len3;
+
+
+  /* path might already point to temp_path, so figure out how long the
+     prefix is so we can make room for it. */
+
+  len1 = strlen(fn_volume) + 1;
+  if (path[0] != '/') {
+    len2 = strlen(fn_cwd);
+    if (len2)
+      len2++;
+  }
+  else
+    path++;
+  len3 = _fstrlen(path);
+  if (len1 + len2 + len3 > sizeof(temp_path) - 1)
+    len3 = sizeof(temp_path) - 1 - len1 - len2;
+  _fmemmove(&temp_path[len1 + len2], path, len3);
+  temp_path[len1 + len2 + len3] = 0;
+  memmove(temp_path, fn_volume, len1 - 1);
+  temp_path[len1 - 1] = '/';
+  if (len2) {
+    memmove(&temp_path[len1], fn_cwd, len2 - 1);
+    temp_path[len1 + len2 - 1] = '/';
   }
 
   return temp_path;
@@ -117,40 +152,43 @@ int findnext(SRCHREC_PTR search)
 
   // FIXME - make these arguments instead of accessing globals
   dos_entry = DOS_SDA_POINTER(dirrec);
-  pattern = DOS_SDA_VALUE(fcb_name);
+  //pattern = DOS_SDA_VALUE(fcb_name);
+  pattern = search->pattern;
   search_attr = search->attr_mask;
 
   search->sequence++;
-  //consolef("NX %i PATTERN: %ls\n", search->sequence, pattern);
+  consolef("FNEXT \"%ls\"\n", pattern);
 
-  if (!search->sector) {
+  if (!search->fndir_handle) {
     fujifs_handle handle;
     errcode err;
 
 
-    err = fujifs_opendir(&handle, "");
+    err = fujifs_opendir(0, &handle, path_with_volume(""));
     if (err) {
       consolef("CAN'T OPEN DIR %i\n", err);
       return DOSERR_UNEXPECTED_NETWORK_ERROR;
     }
-    search->sector = handle;
+    search->fndir_handle = handle;
   }
 
   while (1) {
-    ent = fujifs_readdir(search->sector);
+    ent = fujifs_readdir(search->fndir_handle);
     if (!ent) {
-      fujifs_closedir(search->sector);
-      search->sector = 0;
+      fujifs_closedir(search->fndir_handle);
+      search->fndir_handle = FNDIR_NOTOPEN;
       return DOSERR_NO_MORE_FILES;
     }
     if (filename_match(pattern, ent->name))
       break;
   }
 
+#if 0
   if (!contains_wildcards(pattern)) {
-    fujifs_closedir(search->sector);
-    search->sector = 0;
+    fujifs_closedir(search->fn_handle);
+    search->fn_handle = 0;
   }
+#endif
 
 #if 0
   consolef("ENTRY: \"%s\"\n", ent->name);
@@ -200,6 +238,50 @@ int findfirst(SRCHREC_PTR search)
   DIRREC_PTR dos_entry;
   char far *pattern;
   uint8_t search_attr;
+  uint16_t result;
+
+
+  // FIXME - make these arguments instead of accessing globals
+  dos_entry = DOS_SDA_POINTER(dirrec);
+  pattern = DOS_SDA_VALUE(fcb_name);
+  search_attr = DOS_SDA_VALUE(srch_attr);
+
+  consolef("FF PATTERN: 0x%02x %ls\n", search_attr, pattern);
+
+  _fmemmove(search->pattern, pattern, sizeof(search->pattern));
+  search->attr_mask = search_attr;
+
+  if (search_attr & ATTR_VOLUME_LABEL) {
+    //consolef("VOLUME\n");
+    search->drive_num = (fn_drive_num + 1) | 0x80;
+    _fstrcpy(dos_entry->name, "FUJINET1234");
+    dos_entry->attr = ATTR_VOLUME_LABEL;
+    dos_entry->time = dos_entry->date = 0;
+    dos_entry->size = 0;
+
+    //dumpHex(search, sizeof(*search), 0);
+    //dumpHex(dos_entry, sizeof(*dos_entry), 0);
+    return DOSERR_NONE;
+  }
+
+  if (search->fndir_handle) {
+    fujifs_closedir(search->fndir_handle);
+    search->fndir_handle = 0;
+  }
+  search->sequence = -1;
+  search->drive_num = fn_drive_num | 0xC0;
+
+  result = findnext(search);
+  if (result == DOSERR_NO_MORE_FILES)
+    result = DOSERR_FILE_NOT_FOUND;
+  return result;
+}
+#if 0
+{
+  errcode err;
+  DIRREC_PTR dos_entry;
+  char far *pattern;
+  uint8_t search_attr;
 
 
   //consolef("PATH: %ls\n", DOS_SDA_VALUE(path1));
@@ -209,8 +291,6 @@ int findfirst(SRCHREC_PTR search)
   search_attr = DOS_SDA_VALUE(srch_attr);
 
   //consolef("FF PATTERN: 0x%02x %ls\n", search_attr, pattern);
-
-  search->sector = 0;
 
   if (search_attr & ATTR_VOLUME_LABEL) {
     //consolef("VOLUME\n");
@@ -231,6 +311,7 @@ int findfirst(SRCHREC_PTR search)
 
   return findnext(search);
 }
+#endif
 
 int chdir()
 {
@@ -245,25 +326,27 @@ int chdir()
   consolef("CWD: \"%ls\"\n", DOS_SDA_VALUE(cdsptr));
   consolef("NEW: \"%ls\"\n", new_dir);
 #endif
-  new_dir = undosify_path(new_dir);
+  new_dir = path_with_volume(undosify_path(new_dir));
 #if 0
   consolef("CD TO \"%ls\"\n", new_dir);
 #endif
 
   /* Try to open new_path as a directory first, if it fails then
      either it doesn't exist or wasn't a directory */
-  err = fujifs_opendir(&handle, new_dir);
+  consolef("DIR CHANGING\n");
+  err = fujifs_opendir(0, &handle, new_dir);
   if (err)
     return DOSERR_PATH_NOT_FOUND;
   fujifs_closedir(handle);
 
-  fujifs_chdir(new_dir);
+  fujifs_chdir(fn_host, new_dir);
+  consolef("DIR CHANGED\n");
   return DOSERR_NONE;
 }
 
 int open_extended(SFTREC_PTR sft)
 {
-  char *path;
+  char far *path;
   uint16_t mode, action, attr;
   int err;
   fujifs_handle handle;
@@ -277,7 +360,7 @@ int open_extended(SFTREC_PTR sft)
     return DOSERR_DISK_WRITE_PROTECTED;
   }
 
-  path = undosify_path(DOS_SDA_VALUE(path1));
+  path = DOS_SDA_VALUE(path1);
   action = DOS_SDA_V4_VALUE(action_2E);
   attr = DOS_SDA_V4_VALUE(attr_2E);
 #if 0
@@ -293,6 +376,7 @@ int open_extended(SFTREC_PTR sft)
     //consolef("FCB/PATTERN %ls\n", DOS_SDA_VALUE(fcb_name));
 
     _fmemcpy(sft->file_name, DOS_SDA_VALUE(fcb_name), DOS_FILENAME_LEN);
+    *DOS_SDA_POINTER(srch_attr) = 0x3f;
     findfirst(DOS_SDA_POINTER(srchrec));
     dos_entry = DOS_SDA_POINTER(dirrec);
 
@@ -312,17 +396,22 @@ int open_extended(SFTREC_PTR sft)
       sft->open_mode &= 0x000F;
 
     // FIXME - use constant
-    sft->dev_info_word = 0x8040 | drive_num; // Mark file as being on network drive
+    sft->dev_info_word = 0x8040 | fn_drive_num; // Mark file as being on network drive
 
     // These fields appear to only be for our own use, DOS doesn't look at them
     sft->dev_drvr_ptr = NULL;
     sft->rel_sector = sft->abs_sector = 0xffff;
     sft->dev_drvr_ptr = 0;
     sft->dir_sector = 0;
-    sft->dir_entry_no = 0xff;
+    sft->dir_entry_no = -1;
   }
 
-  err = fujifs_open(&handle, path, FUJIFS_READ);
+  path = undosify_path(path);
+  consolef("UNDOSIFY \"%s\"\n", path);
+  path = path_with_volume(path);
+  consolef("opening file \"%s\"\n", path);
+  err = fujifs_open(0, &handle, path, FUJIFS_READ);
+  consolef("opened\n");
   if (err == NETWORK_ERROR_FILE_NOT_FOUND)
     return DOSERR_FILE_NOT_FOUND;
   else if (err) {
@@ -330,14 +419,15 @@ int open_extended(SFTREC_PTR sft)
     return DOSERR_READ_FAULT;
   }
 
-  sft->start_sector = handle;
+  sft->fnfile_handle = handle;
 
+  dumpHex(sft, sizeof(*sft), 0);
   return DOSERR_NONE;
 }
 
 int close_file(SFTREC_PTR sft)
 {
-  fujifs_close(sft->start_sector);
+  fujifs_close(sft->fnfile_handle);
   return DOSERR_NONE;
 }
 
@@ -346,7 +436,7 @@ int read_file(SFTREC_PTR sft, uint16_t far *len_ptr)
   uint16_t rlen;
 
 
-  rlen = fujifs_read(sft->start_sector, DOS_SDA_VALUE(current_dta), *len_ptr);
+  rlen = fujifs_read(sft->fnfile_handle, DOS_SDA_VALUE(current_dta), *len_ptr);
   *len_ptr = rlen;
 
   // These fields appear to only be for our own use, DOS doesn't look at them
@@ -389,8 +479,6 @@ void __interrupt redirector(union INTPACK regs)
     goto not_us;
   }
 
-  //consolef("FN REDIR 0x%02x/%02x\n", func, subfunc);
-
   if (subfunc == SUBF_INQUIRY) {
     regs.x.ax = 0x00ff;
     regs.x.flags &= ~INTR_CF;
@@ -403,6 +491,8 @@ void __interrupt redirector(union INTPACK regs)
   path = DOS_SDA_VALUE(cdsptr);
   if (_fstrncmp(path, "FujiNet ", 8) != 0)
     goto not_us;
+
+  consolef("DISPATCH IN 0x%02x\n", subfunc);
 
   regs.x.ax = 0;
   regs.x.flags &= ~INTR_CF;
@@ -459,12 +549,12 @@ void __interrupt redirector(union INTPACK regs)
     break;
   }
 
-  //consolef("FN REDIR 0x%02x/%02x  RESULT: 0x%04x\n", func, subfunc, result);
-
   if (result) {
     regs.x.ax = result;
     regs.x.flags |= INTR_CF;
   }
+
+  consolef("DISPATCH OUT err: %i result: 0x%04x\n", regs.x.flags & INTR_CF, regs.x.ax);
 
   return;
 

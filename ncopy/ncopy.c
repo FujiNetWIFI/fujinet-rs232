@@ -17,9 +17,9 @@
 
 char buf[256];
 
-void print_dir();
-void get_file(const char *source, const char *dest);
-void put_file(const char *source, const char *dest);
+void print_dir(fujifs_handle host);
+void get_file(fujifs_handle host, const char *source, const char *dest);
+void put_file(fujifs_handle host, const char *source, const char *dest);
 void get_password(char *password, size_t max_len);
 
 void main(int argc, char *argv[])
@@ -57,9 +57,6 @@ void main(int argc, char *argv[])
   // Opened succesfully, we don't need it anymore
   err = fujifs_close_url(host);
 
-  // Tell FujiNet to remember it was open
-  fujifs_chdir(url);
-  
   while (!done) {
     printf("ncopy> ");
     fflush(stdout);
@@ -70,19 +67,19 @@ void main(int argc, char *argv[])
     cmd = parse_command(buf);
     switch (cmd.cmd) {
     case CMD_DIR:
-      print_dir();
+      print_dir(host);
       break;
 
     case CMD_GET:
-      get_file(cmd.args[1], cmd.args[2]);
+      get_file(host, cmd.args[1], cmd.args[2]);
       break;
 
     case CMD_PUT:
-      put_file(cmd.args[1], cmd.args[2]);
+      put_file(host, cmd.args[1], cmd.args[2]);
       break;
 
     case CMD_CD:
-      fujifs_chdir(cmd.args[1]);
+      fujifs_chdir(host, cmd.args[1]);
       break;
 
     case CMD_EXIT:
@@ -98,7 +95,7 @@ void main(int argc, char *argv[])
   exit(0);
 }
 
-void print_dir()
+void print_dir(fujifs_handle host)
 {
   errcode err;
   size_t len;
@@ -106,7 +103,7 @@ void print_dir()
   fujifs_handle handle;
 
 
-  err = fujifs_opendir(&handle, "");
+  err = fujifs_opendir(host, &handle, "");
   if (err) {
     printf("Unable to read directory\n");
     return;
@@ -135,7 +132,7 @@ void print_dir()
   return;
 }
 
-void get_file(const char *source, const char *dest)
+void get_file(fujifs_handle host, const char *source, const char *dest)
 {
   FILE *file;
   errcode err;
@@ -152,7 +149,7 @@ void get_file(const char *source, const char *dest)
     return;
   }
 
-  err = fujifs_open(&handle, source, FUJIFS_READ);
+  err = fujifs_open(host, &handle, source, FUJIFS_READ);
   if (err) {
     printf("Failed to open remote file: %s\n", source);
     fclose(file);
@@ -177,7 +174,7 @@ void get_file(const char *source, const char *dest)
   return;
 }
 
-void put_file(const char *source, const char *dest)
+void put_file(fujifs_handle host, const char *source, const char *dest)
 {
   FILE *file;
   errcode err;
@@ -194,7 +191,7 @@ void put_file(const char *source, const char *dest)
     return;
   }
 
-  err = fujifs_open(&handle, dest, FUJIFS_WRITE);
+  err = fujifs_open(host, &handle, dest, FUJIFS_WRITE);
   if (err) {
     printf("Failed to open remote file: %s\n", dest);
     fclose(file);

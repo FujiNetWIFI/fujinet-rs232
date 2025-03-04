@@ -31,7 +31,6 @@ int main(int argc, char *argv[])
   int drive_letter;
   const char *url;
   errcode err;
-  fujifs_handle host;
 
 
   if (argc < 2) {
@@ -46,10 +45,10 @@ int main(int argc, char *argv[])
   }
 
   drive_letter = toupper(argv[2][0]);
-  drive_num = drive_letter - 'A';
+  fn_drive_num = drive_letter - 'A';
   url = argv[3];
 
-  err = fujifs_open_url(&host, url, NULL, NULL);
+  err = fujifs_open_url(&fn_host, url, NULL, NULL);
   if (err) {
     // Maybe authentication is needed?
     printf("User: ");
@@ -60,7 +59,7 @@ int main(int argc, char *argv[])
     fflush(stdout);
     get_password(&buf[128], 128);
 
-    err = fujifs_open_url(&host, url, buf, &buf[128]);
+    err = fujifs_open_url(&fn_host, url, buf, &buf[128]);
     if (err) {
       printf("Err: %i unable to open URL: %s\n", err, url);
       exit(1);
@@ -68,10 +67,13 @@ int main(int argc, char *argv[])
   }
 
   // Opened succesfully, we don't need it anymore
-  err = fujifs_close_url(host);
+  err = fujifs_close_url(fn_host);
 
-  // Tell FujiNet to remember it was open
-  fujifs_chdir(url);
+  strcpy(fn_volume, url);
+  end = strlen(fn_volume);
+  if (fn_volume[end - 1] == '/')
+    fn_volume[end - 1] = 0;
+  fn_cwd[0] = 0;
 
   // FIXME - allocate drive letter
   regs.x.ax = 0x5D06;
@@ -96,12 +98,12 @@ int main(int argc, char *argv[])
 
     our_cds_ptr = lolptr->cds_ptr;
     if (_osmajor == 3)
-      our_cds_ptr = our_cds_ptr + drive_num;
+      our_cds_ptr = our_cds_ptr + fn_drive_num;
     else {
       CDS_PTR_V4 t = (CDS_PTR_V4) our_cds_ptr;
 
 
-      t = t + drive_num;
+      t = t + fn_drive_num;
       our_cds_ptr = (CDS_PTR_V3) t;
     }
 
@@ -110,9 +112,9 @@ int main(int argc, char *argv[])
     dumpHex(lolptr, sizeof(*lolptr), 0);
 #endif
 
-    if (drive_num >= lolptr->last_drive) {
+    if (fn_drive_num >= lolptr->last_drive) {
       printf("Drive letter %c higher than last drive %c",
-             drive_num + 'A', lolptr->last_drive + 'A');
+             fn_drive_num + 'A', lolptr->last_drive + 'A');
       exit(1);
     }
 
@@ -128,7 +130,7 @@ int main(int argc, char *argv[])
     our_cds_ptr->flags |= 0xc000;
     _fstrcpy(our_cds_ptr->current_path, FUJINET_PATH_BASE);
     our_cds_ptr->current_path[_fstrlen(our_cds_ptr->current_path) - 3] =
-      (char) ('A' + drive_num);
+      (char) ('A' + fn_drive_num);
     current_path = our_cds_ptr->current_path;
     our_cds_ptr->root_ofs = _fstrlen(our_cds_ptr->current_path) - 1;
     current_path += our_cds_ptr->root_ofs;
