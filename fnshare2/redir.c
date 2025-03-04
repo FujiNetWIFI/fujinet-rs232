@@ -337,12 +337,10 @@ void fnext(void)
 
   fcbitize(dirrec_ptr1->fcb_name, ent->name);
   dirrec_ptr1->attr = ent->isdir ? ATTR_DIRECTORY : 0;
-#if 0
   dos_date = (ent->mtime.tm_mday)
     | ((ent->mtime.tm_mon + 1) << 5) | ((ent->mtime.tm_year - 80) << 9);
   dos_time = (ent->mtime.tm_sec / 2)
     | (ent->mtime.tm_min << 5) | (ent->mtime.tm_hour << 11);
-#endif
   dirrec_ptr1->time = dos_time;
   dirrec_ptr1->date = dos_date;
   dirrec_ptr1->size = ent->size;
