@@ -1,6 +1,6 @@
 #include "netredir.h"
 #include "dosdata.h"
-#include "../ncopy/fujifs.h"
+#include "fujifs.h"
 #include <dos.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -75,7 +75,6 @@ int main(int argc, char *argv[])
     fn_volume[end - 1] = 0;
   fn_cwd[0] = 0;
 
-  // FIXME - allocate drive letter
   regs.x.ax = 0x5D06;
   intdosx(&regs, &regs, &segr);
   sda_ptr = MK_FP(segr.ds, regs.x.si);

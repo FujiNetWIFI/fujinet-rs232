@@ -24,6 +24,8 @@
 #include "xms.h"
 #include "ramdrive.h"
 #include "redir.h"
+#include "fujifs.h"
+#include <stdio.h>	// printf
 #include <stdlib.h>
 #include <dos.h>
 #include <memory.h>
@@ -32,6 +34,8 @@
 #include <fcntl.h>
 #include <bios.h>
 #include <time.h>
+#include <conio.h>	// getch
+#include <strings.h>	// strcasecmp
 
 #define DEBUG
 #ifdef DEBUG
@@ -47,23 +51,6 @@
 #ifndef MK_FP
 #define MK_FP(a,b)  ((void far *)(((uint32_t)(a) << 16) | (b)))
 #endif
-
-char *signon_string =
-  "\r\n"
-  "PHANTOM: A Network-Redirector Based XMS Ram Disk\r\n"
-  "Copyright (c) David Maxey 1993.  All rights reserved.\r\n"
-  "From \"Undocumented DOS\", 2nd edition (Addison-Wesley, 1993)\r\n";
-
-char *usage_string =
-  "Usage:\r\n"
-  "    PHANTOM [-Snnnn] d:\r\n"
-  " Or\r\n"
-  "    PHANTOM -U\r\n"
-  "\r\n"
-  "where:\r\n"
-  "    -Snnnn  specifies size of Ram Disk in kb of XMS\r\n"
-  "    d:      specifies drive letter to use\r\n"
-  "    -U      unloads the latest copy of Phantom loaded\r\n";
 
 /* ************************************************
    Global data declarations
@@ -123,26 +110,26 @@ int match_to_mask(char far *mask, char far *filename)
 void set_up_pointers(void)
 {
   if (_osmajor == 3) {
-    fcbname_ptr = ((SDA_PTR_V3) sda_ptr)->fcb_name1;
-    filename_ptr = ((SDA_PTR_V3) sda_ptr)->path1 + cds_root_size - 1;
-    fcbname_ptr_2 = ((SDA_PTR_V3) sda_ptr)->fcb_name2;
-    filename_ptr_2 = ((SDA_PTR_V3) sda_ptr)->path2 + cds_root_size - 1;
-    srchrec_ptr = &((SDA_PTR_V3) sda_ptr)->srchrec;
-    dirrec_ptr = &((SDA_PTR_V3) sda_ptr)->dirrec;
-    srchrec_ptr_2 = &((SDA_PTR_V3) sda_ptr)->rename_srchrec;
-    dirrec_ptr_2 = &((SDA_PTR_V3) sda_ptr)->rename_dirrec;
+    dirrec_ptr1 = &((SDA_PTR_V3) sda_ptr)->dirrec;
+    dirrec_ptr2 = &((SDA_PTR_V3) sda_ptr)->rename_dirrec;
+    fcbname_ptr1 = ((SDA_PTR_V3) sda_ptr)->fcb_name1;
+    fcbname_ptr2 = ((SDA_PTR_V3) sda_ptr)->fcb_name2;
+    filename_ptr1 = ((SDA_PTR_V3) sda_ptr)->path1 + cds_root_size - 1;
+    filename_ptr2 = ((SDA_PTR_V3) sda_ptr)->path2 + cds_root_size - 1;
     srch_attr_ptr = &((SDA_PTR_V3) sda_ptr)->srch_attr;
+    srchrec_ptr1 = &((SDA_PTR_V3) sda_ptr)->srchrec;
+    srchrec_ptr2 = &((SDA_PTR_V3) sda_ptr)->rename_srchrec;
   }
   else {
-    fcbname_ptr = ((SDA_PTR_V4) sda_ptr)->fcb_name;
-    filename_ptr = ((SDA_PTR_V4) sda_ptr)->path1 + cds_root_size - 1;
-    fcbname_ptr_2 = ((SDA_PTR_V4) sda_ptr)->fcb_name_2;
-    filename_ptr_2 = ((SDA_PTR_V4) sda_ptr)->path2 + cds_root_size - 1;
-    srchrec_ptr = &((SDA_PTR_V4) sda_ptr)->srchrec;
-    dirrec_ptr = &((SDA_PTR_V4) sda_ptr)->dirrec;
-    srchrec_ptr_2 = &((SDA_PTR_V4) sda_ptr)->rename_srchrec;
-    dirrec_ptr_2 = &((SDA_PTR_V4) sda_ptr)->rename_dirrec;
+    dirrec_ptr1 = &((SDA_PTR_V4) sda_ptr)->dirrec;
+    dirrec_ptr2 = &((SDA_PTR_V4) sda_ptr)->rename_dirrec;
+    fcbname_ptr1 = ((SDA_PTR_V4) sda_ptr)->fcb_name1;
+    fcbname_ptr2 = ((SDA_PTR_V4) sda_ptr)->fcb_name2;
+    filename_ptr1 = ((SDA_PTR_V4) sda_ptr)->path1 + cds_root_size - 1;
+    filename_ptr2 = ((SDA_PTR_V4) sda_ptr)->path2 + cds_root_size - 1;
     srch_attr_ptr = &((SDA_PTR_V4) sda_ptr)->srch_attr;
+    srchrec_ptr1 = &((SDA_PTR_V4) sda_ptr)->srchrec;
+    srchrec_ptr2 = &((SDA_PTR_V4) sda_ptr)->rename_srchrec;
   }
 }
 
@@ -210,18 +197,18 @@ void set_up_cds(void)
 
   our_cds_ptr = lolptr->cds_ptr;
   if (_osmajor == 3)
-//              our_cds_ptr = our_cds_ptr + (our_drive_no - 1);  // ref: DR_TOO_HIGH
-    our_cds_ptr = our_cds_ptr + our_drive_no;
+//              our_cds_ptr = our_cds_ptr + (fn_drive_num - 1);  // ref: DR_TOO_HIGH
+    our_cds_ptr = our_cds_ptr + fn_drive_num;
   else {
     CDS_PTR_V4 t = (CDS_PTR_V4) our_cds_ptr;
 
-//              t = t + (our_drive_no - 1);  // ref: DR_TOO_HIGH
-    t = t + our_drive_no;
+//              t = t + (fn_drive_num - 1);  // ref: DR_TOO_HIGH
+    t = t + fn_drive_num;
     our_cds_ptr = (CDS_PTR_V3) t;
   }
 
-//      if (our_drive_no > lolptr->last_drive)  // ref: DR_TOO_HIGH
-  if (our_drive_no >= lolptr->last_drive)
+//      if (fn_drive_num > lolptr->last_drive)  // ref: DR_TOO_HIGH
+  if (fn_drive_num >= lolptr->last_drive)
     failprog("Drive letter higher than last drive.");
 
   // Check that this drive letter is currently invalid (not in use already)
@@ -235,8 +222,8 @@ void set_up_cds(void)
   cds_root_size = _fstrlen(cds_path_root);
   _fstrcpy(our_cds_ptr->current_path, cds_path_root);
   our_cds_ptr->current_path[_fstrlen(our_cds_ptr->current_path) - 3] =
-//              (char) ('@'+ our_drive_no);  // ref: DR_TOO_HIGH
-    (char) ('A' + our_drive_no);
+//              (char) ('@'+ fn_drive_num);  // ref: DR_TOO_HIGH
+    (char) ('A' + fn_drive_num);
   _fstrcpy(cds_path_root, our_cds_ptr->current_path);
   current_path = our_cds_ptr->current_path;
   our_cds_ptr->root_ofs = _fstrlen(our_cds_ptr->current_path) - 1;
@@ -275,10 +262,8 @@ void exit_ret()
   }
 
   _dos_setvect(ul_i, NULL);
-//      our_drive_str[0] = (char) (our_drive_no + '@');  // ref: DR_TOO_HIGH
-  our_drive_str[0] = (char) (our_drive_no + 'A');
-  print_string(our_drive_str, FALSE);
-  print_string(" is now invalid.", TRUE);
+  printf("%c is now invalid.\n", fn_drive_num + 'A');
+  return;
 }
 
 void unload_latest()
@@ -314,7 +299,7 @@ void unload_latest()
   _dos_setvect(0x2f, p_vect);
   p_vect = _dos_getvect(ul_i);
   psp = ((SIGREC_PTR) p_vect)->psp;
-  our_drive_no = ((SIGREC_PTR) p_vect)->drive_no;
+  fn_drive_num = ((SIGREC_PTR) p_vect)->drive_no;
 
   // Free up the XMS memory
   if ((!xms_is_present()) || (!xms_free_block(((SIGREC_PTR) p_vect)->xms_handle)))
@@ -322,13 +307,13 @@ void unload_latest()
 
   cds_ptr = lolptr->cds_ptr;
   if (_osmajor == 3)
-//              cds_ptr += (our_drive_no - 1);  // ref: DR_TOO_HIGH
-    cds_ptr += our_drive_no;
+//              cds_ptr += (fn_drive_num - 1);  // ref: DR_TOO_HIGH
+    cds_ptr += fn_drive_num;
   else {
     CDS_PTR_V4 t = (CDS_PTR_V4) cds_ptr;
 
-//              t += (our_drive_no - 1);  // ref: DR_TOO_HIGH
-    t += our_drive_no;
+//              t += (fn_drive_num - 1);  // ref: DR_TOO_HIGH
+    t += fn_drive_num;
     cds_ptr = (CDS_PTR_V3) t;
   }
 
@@ -414,7 +399,7 @@ void prepare_for_tsr(void)
 
   sigrec.xms_handle = xms_handle;
   sigrec.psp = _psp;
-  sigrec.drive_no = our_drive_no;
+  sigrec.drive_no = fn_drive_num;
   sigrec.our_handler = (void far *) redirector;
   sigrec.prev_handler = (void far *) prev_int2f_vector;
   *((SIGREC_PTR) buf) = sigrec;
@@ -437,52 +422,87 @@ void tsr(void)
 
 /* --------------------------------------------------------------------*/
 
-int _cdecl main(uint16_t argc, char **argv)
+void get_password(char *password, size_t max_len)
 {
-  print_string(signon_string, TRUE);
+  size_t idx = 0;
+  char ch;
 
-  // See what parameters we have...
-  for (argv++; *argv; argv++) {
-    switch (**argv) {
-    case '-':
-    case '/':
-      (*argv)++;
-      switch (toupper(**argv)) {
-      case 'U':
-        get_dos_vars();
-        unload_latest();
-        return 0;
-      case 'S':
-        (*argv)++;
-        if (!(disk_size = atoi(*argv))) {
-          print_string("Bad size parameter.", TRUE);
-          return 0;
-        }
-        break;
-      default:
-        print_string("Unrecognized parameter.", TRUE);
-        return 0;
-      }
+
+  while (idx < max_len - 1) {
+    ch = getch();
+
+    if (ch == '\r' || ch == '\n')
       break;
-    default:
-      our_drive_str[0] = **argv;
+
+    // Handle backspace/delete
+    if (ch == '\b' || ch == 127) {
+      if (idx) {
+        // Erase '*' from the screen
+        printf("\b \b");
+        fflush(stdout);
+        idx--;
+      }
+    }
+    else {
+      password[idx++] = ch;
+      printf("*");
+      fflush(stdout);
     }
   }
 
-  // Otherwise, check that it's a valid drive letter
-  if (our_drive_str[0] == ' ') {
-    print_string(usage_string, TRUE);
-    return 0;
+  password[idx] = 0;
+  printf("\n");
+  return;
+}
+
+int _cdecl main(uint16_t argc, char **argv)
+{
+  uint8_t drive_letter;
+  const char *url;
+  errcode err;
+  
+
+  if (argc < 2) {
+    printf("Usage: %s <command>\n", argv[0]);
+    exit(1);
   }
 
-  our_drive_str[0] &= ~0x20;
-//      our_drive_no = (uint8_t) (our_drive_str[0] - '@');  // ref: DR_TOO_HIGH
-  our_drive_no = (uint8_t) (our_drive_str[0] - 'A');
-//      if ((our_drive_no > 26) || (our_drive_no < 1))  // ref: DR_TOO_HIGH
-  if (our_drive_no > 25) {
-    print_string(usage_string, TRUE);
-    return 0;
+  // Only support map command at this time
+  if (strcasecmp(argv[1], "map") != 0 || argc < 4) {
+    printf("Usage: %s map L: <url_of_share>\n", argv[0]);
+    exit(1);
   }
+
+  drive_letter = toupper(argv[2][0]);
+  fn_drive_num = drive_letter - 'A';
+  url = argv[3];
+
+  err = fujifs_open_url(&fn_host, url, NULL, NULL);
+  if (err) {
+    // Maybe authentication is needed?
+    printf("User: ");
+    fgets(sector_buffer, 128, stdin);
+    if (sector_buffer[0])
+      sector_buffer[strlen(sector_buffer) - 1] = 0;
+    printf("Password: ");
+    fflush(stdout);
+    get_password(&sector_buffer[128], 128);
+
+    err = fujifs_open_url(&fn_host, url, sector_buffer, &sector_buffer[128]);
+    if (err) {
+      printf("Err: %i unable to open URL: %s\n", err, url);
+      exit(1);
+    }
+  }
+
+  // Opened succesfully, we don't need it anymore
+  err = fujifs_close_url(fn_host);
+
+  strcpy(fn_volume, url);
+  end = strlen(fn_volume);
+  if (fn_volume[end - 1] == '/')
+    fn_volume[end - 1] = 0;
+  fn_cwd[0] = 0;
 
   // Initialize XMS and alloc the 'disk space'
   set_up_xms_disk();
@@ -492,10 +512,7 @@ int _cdecl main(uint16_t argc, char **argv)
   set_up_pointers();
 
   // Tell the user
-  print_string(my_ltoa(disk_size), FALSE);
-  print_string("Kb XMS allocated.", TRUE);
-  print_string("FujiNet installed as ", FALSE);
-  print_string(our_drive_str, TRUE);
+  printf("FujiNet installed as %c:\n", fn_drive_num + 'A');
 
   prepare_for_tsr();
 

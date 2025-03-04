@@ -49,7 +49,7 @@ enum {
 /* FindFirst/Next data block - ALL DOS VERSIONS */
 typedef struct {
   uint8_t drive_num;
-  char pattern[11];
+  char pattern[DOS_FCBNAME_LEN];
   uint8_t attr_mask;
   uint16_t sequence;
   //uint16_t sector;
@@ -59,7 +59,7 @@ typedef struct {
 
 /* DOS Directory entry for 'found' file - ALL DOS VERSIONS */
 typedef struct {
-  char fcb_name[11];
+  char fcb_name[DOS_FCBNAME_LEN];
   uint8_t attr;
   uint8_t _reserved1[10];
   union {
@@ -86,9 +86,9 @@ typedef struct {
   SRCHREC srchrec;
   DIRREC dirrec;
   uint8_t _reserved3[81];
-  char fcb_name1[11];
+  char fcb_name1[DOS_FCBNAME_LEN];
   uint8_t _reserved4;
-  char fcb_name2[11];
+  char fcb_name2[DOS_FCBNAME_LEN];
   uint8_t _reserved5[11];
   uint8_t srch_attr;
   uint8_t open_mode;
@@ -113,9 +113,9 @@ typedef struct {
   SRCHREC srchrec;
   DIRREC dirrec;
   uint8_t _reserved3[88];
-  char fcb_name[11];
+  char fcb_name1[DOS_FCBNAME_LEN];
   uint8_t _reserved4;
-  char fcb_name_2[11];
+  char fcb_name2[DOS_FCBNAME_LEN];
   uint8_t _reserved5[11];
   uint8_t srch_attr;
   uint8_t open_mode;
@@ -179,7 +179,7 @@ typedef struct {
   uint16_t abs_sector;
   uint16_t dir_sector;
   uint8_t sequence;
-  char fcb_name[11];
+  char fcb_name[DOS_FCBNAME_LEN];
 } SFTREC, far *SFTREC_PTR;
 
 /* DOS 4.00 and above lock/unlock region structure */

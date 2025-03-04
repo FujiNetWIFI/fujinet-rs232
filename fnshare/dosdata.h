@@ -3,8 +3,11 @@
 
 #include <stdint.h>
 
+#define TRUE			1
+#define FALSE			0
+
 #define DOS_MAX_PATHLEN         256
-#define DOS_FILENAME_LEN        11
+#define DOS_FCBNAME_LEN         11
 
 enum {
   MODE_READONLY         = 0x00,
@@ -46,7 +49,7 @@ enum {
 /* FindFirst/Next data block - ALL DOS VERSIONS */
 typedef struct {
   uint8_t drive_num;
-  char pattern[11];
+  char pattern[DOS_FCBNAME_LEN];
   uint8_t attr_mask;
   uint16_t sequence;
   //uint16_t sector;
@@ -56,10 +59,15 @@ typedef struct {
 
 /* DOS Directory entry for 'found' file - ALL DOS VERSIONS */
 typedef struct {
-  char name[11];
+  char fcb_name[DOS_FCBNAME_LEN];
   uint8_t attr;
   uint8_t _reserved1[10];
-  uint16_t time, date;
+  union {
+    struct {
+      uint16_t time, date;
+    };
+    uint32_t datetime;
+  };
   uint16_t start_sector;
   uint32_t size;
 } DIRREC, far *DIRREC_PTR;
@@ -78,9 +86,9 @@ typedef struct {
   SRCHREC srchrec;
   DIRREC dirrec;
   uint8_t _reserved3[81];
-  char fcb_name[11];
+  char fcb_name1[DOS_FCBNAME_LEN];
   uint8_t _reserved4;
-  char fcb_name_2[11];
+  char fcb_name2[DOS_FCBNAME_LEN];
   uint8_t _reserved5[11];
   uint8_t srch_attr;
   uint8_t open_mode;
@@ -105,9 +113,9 @@ typedef struct {
   SRCHREC srchrec;
   DIRREC dirrec;
   uint8_t _reserved3[88];
-  char fcb_name[11];
+  char fcb_name1[DOS_FCBNAME_LEN];
   uint8_t _reserved4;
-  char fcb_name_2[11];
+  char fcb_name2[DOS_FCBNAME_LEN];
   uint8_t _reserved5[11];
   uint8_t srch_attr;
   uint8_t open_mode;
@@ -154,21 +162,34 @@ typedef struct {
 typedef struct {
   uint16_t handle_count;
   uint16_t open_mode;
-  uint8_t file_attr;
+  uint8_t attr;
   uint16_t dev_info_word;
   uint8_t far *dev_drvr_ptr;
   //uint16_t start_sector;
   uint16_t fnfile_handle;
-  uint16_t file_time;
-  uint16_t file_date;
-  uint32_t file_size;
-  uint32_t file_pos;
+  union {
+    struct {
+      uint16_t time, date;
+    };
+    uint32_t datetime;
+  };
+  uint32_t size;
+  uint32_t pos;
   uint16_t rel_sector;
   uint16_t abs_sector;
   uint16_t dir_sector;
-  uint8_t dir_entry_no;
-  char file_name[11];
+  uint8_t sequence;
+  char fcb_name[DOS_FCBNAME_LEN];
 } SFTREC, far *SFTREC_PTR;
+
+/* DOS 4.00 and above lock/unlock region structure */
+/* see lockfil() below (Thanks to Martin Westermeier.) */
+typedef struct {
+  uint32_t region_offset;
+  uint32_t region_length;
+  uint8_t f0[13];
+  char file_name[80];           // 80 is a guess
+} LOCKREC, far *LOCKREC_PTR;
 
 #pragma pack(pop)
 

@@ -61,4 +61,12 @@ extern __segment getDS(void);
 #pragma aux getDS = \
     "mov ax, ds";
 
+extern __segment getSS(void);
+#pragma aux getSS = \
+    "mov ax, ss";
+
+extern __segment getBP(void);
+#pragma aux getBP = \
+    "mov ax, bp";
+
 #endif /* _NETREDIR_H */
