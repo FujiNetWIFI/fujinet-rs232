@@ -1,8 +1,8 @@
 #include "redir.h"
 #include "ramdrive.h"
 #include "dosfunc.h"
-#include "../ncopy/fujifs.h"
-#include "../fnshare/doserr.h"
+#include "fujifs.h"
+#include "doserr.h"
 #include <stdlib.h>
 #include <dos.h>
 #include <string.h>
@@ -12,7 +12,7 @@
 #define DEBUG
 #undef DEBUG_DISPATCH
 #if defined(DEBUG)
-#include "../../fujinet-rs232/sys/print.h"
+#include "print.h"
 #endif
 
 #define URL "tnfs://10.4.0.1"
@@ -944,7 +944,7 @@ void fill_sft(SFTREC_PTR p, int use_found_1, int truncate)
       p->fnfile_handle = dirrec_ptr->fnfile_handle;
 #endif
     p->size = truncate ? 0L : dirrec_ptr->size;
-    p->fnfile_handle = 0;//srchrec_ptr->fndir_handle;
+    //p->fnfile_handle = srchrec_ptr->fndir_handle;
     p->sequence = (uint8_t) srchrec_ptr->sequence;
   }
   else {
@@ -1035,7 +1035,7 @@ void unknown_fxn_2D()
 #define OPEN_IF_EXISTS                  0x01
 #define REPLACE_IF_EXISTS               0x02
 
-void special_opnfil(void)
+void open_extended(void)
 {
   SFTREC_PTR p = (SFTREC_PTR) MK_FP(r.es, r.di);
   uint16_t open_mode, action;
@@ -1158,7 +1158,7 @@ PROC dispatch_table[] = {
   unsupported,          /* 0x2Bh */
   unsupported,          /* 0x2Ch */
   unknown_fxn_2D,       /* 0x2Dh */
-  special_opnfil        /* 0x2Eh */
+  open_extended        /* 0x2Eh */
 };
 
 #define MAX_FXN_NO (sizeof(dispatch_table) / sizeof(PROC))
