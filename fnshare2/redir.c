@@ -10,14 +10,12 @@
 
 #define DO_FUJI 1
 #define DEBUG
-#define DEBUG_DISPATCH
+#undef DEBUG_DISPATCH
 #if defined(DEBUG)
 #include "../../fujinet-rs232/sys/print.h"
 #endif
 
 #define URL "tnfs://10.4.0.1"
-#define FNDIR_HANDLE dir_sector
-#define FNSFT_HANDLE start_sector
 
 #define STACK_SIZE 1024
 
@@ -48,7 +46,7 @@
 #define _unsupported    0xFF
 
 // FIXME - this is essentially the same as dispatch_table
-uchar fxnmap[] = {
+uint8_t fxnmap[] = {
   _inquiry,     /* 0x00h */
   _rd,  /* 0x01h */
   _unsupported, /* 0x02h */
@@ -99,30 +97,30 @@ uchar fxnmap[] = {
 };
 
 ALL_REGS r;                     /* Global save area for all caller's regs */
-uchar our_drive_no;             /* A: is 1, B: is 2, etc. */
+uint8_t our_drive_no;             /* A: is 1, B: is 2, etc. */
 char our_drive_str[3] = " :";   /* Our drive letter string */
 char far *cds_path_root = "Phantom  :\\";       /* Root string for CDS */
-uint cds_root_size;             /* Size of our CDS root string */
-uint far *stack_param_ptr;      /* ptr to word at top of stack on entry */
+uint16_t cds_root_size;             /* Size of our CDS root string */
+uint16_t far *stack_param_ptr;      /* ptr to word at top of stack on entry */
 int curr_fxn;                   /* Record of function in progress */
 int filename_is_char_device;    /* generate_fcbname found character device name */
 INTVECT prev_int2f_vector;      /* For chaining, and restoring on unload */
 
-uint dos_ss;                    /* DOS's saved SS at entry */
-uint dos_sp;                    /* DOS's saved SP at entry */
-uint our_sp;                    /* SP to switch to on entry */
-uint save_sp;                   /* SP saved across internal DOS calls */
+uint16_t dos_ss;                    /* DOS's saved SS at entry */
+uint16_t dos_sp;                    /* DOS's saved SP at entry */
+uint16_t our_sp;                    /* SP to switch to on entry */
+uint16_t save_sp;                   /* SP saved across internal DOS calls */
 char our_stack[STACK_SIZE];     /* our internal stack */
 
 /* these are version independent pointers to various frequently used
         locations within the various DOS structures */
-uchar far *sda_ptr;             /* ptr to SDA */
+uint8_t far *sda_ptr;             /* ptr to SDA */
 char far *current_path;         /* ptr to current path in CDS */
 char far *filename_ptr;         /* ptr to 1st filename area in SDA */
 char far *filename_ptr_2;       /* ptr to 2nd filename area in SDA */
 char far *fcbname_ptr;          /* ptr to 1st FCB-style name in SDA */
 char far *fcbname_ptr_2;        /* ptr to 2nd FCB-style name in SDA */
-uchar far *srch_attr_ptr;       /* ptr to search attribute in SDA */
+uint8_t far *srch_attr_ptr;       /* ptr to search attribute in SDA */
 SRCHREC_PTR srchrec_ptr;        /* ptr to 1st Search Data Block in SDA */
 SRCHREC_PTR srchrec_ptr_2;      /* ptr to 2nd Search Data Block in SDA */
 DIRREC_PTR dirrec_ptr;          /* ptr to 1st found dir entry area in SDA */
@@ -147,7 +145,7 @@ extern __segment getDS(void);
 /* Fail the current redirector call with the supplied error number, i.e.
    set the carry flag in the returned flags, and set ax=error code */
 
-void fail(uint err)
+void fail(uint16_t err)
 {
   r.flags = (r.flags | FCARRY);
   r.ax = err;
@@ -263,7 +261,7 @@ void fcbitize(char far *dest, const char *source)
 void fnext(void)
 {
 #if 0
-  if (!find_next_entry(srchrec_ptr->srch_mask,
+  if (!find_next_entry(srchrec_ptr->pattern,
                        srchrec_ptr->attr_mask, dirrec_ptr->file_name,
                        &dirrec_ptr->file_attr, &dirrec_ptr->file_time,
                        &dirrec_ptr->start_sector, &dirrec_ptr->file_size,
@@ -280,9 +278,9 @@ void fnext(void)
   // FIXME - make these arguments instead of accessing globals
   search_attr = srchrec_ptr->attr_mask;
 
-  consolef("FNEXT \"%ls\"\n", srchrec_ptr->srch_mask);
+  //consolef("FNEXT \"%ls\"\n", srchrec_ptr->pattern);
   //consolef("DIR ENTRY NO %i\n", srchrec_ptr->dir_entry_no);
-  if (srchrec_ptr->FNDIR_HANDLE == -1) {
+  if (srchrec_ptr->fndir_handle == -1) {
 #if DO_FUJI
     fujifs_handle handle;
     errcode err;
@@ -293,24 +291,24 @@ void fnext(void)
       fail(DOSERR_UNEXPECTED_NETWORK_ERROR);
       return;
     }
-    srchrec_ptr->FNDIR_HANDLE = handle;
+    srchrec_ptr->fndir_handle = handle;
 #else
-    srchrec_ptr->FUJINET_HANDLE = 0;
+    srchrec_ptr->fnfile_handle = 0;
 #endif
-    srchrec_ptr->dir_entry_no = 0;
+    srchrec_ptr->sequence = 0;
   }
 
   while (1) {
 #if DO_FUJI
-    ent = fujifs_readdir(srchrec_ptr->FNDIR_HANDLE);
+    ent = fujifs_readdir(srchrec_ptr->fndir_handle);
 #else
     ent = NULL;
-    if (fake_files[srchrec_ptr->FUJINET_HANDLE]) {
+    if (fake_files[srchrec_ptr->fnfile_handle]) {
       ent = &fake_ent;
-      fake_ent.name = fake_files[srchrec_ptr->FUJINET_HANDLE++];
-      fake_ent.mtime.tm_mon = srchrec_ptr->FUJINET_HANDLE;
-      fake_ent.mtime.tm_year = 2025 - srchrec_ptr->FUJINET_HANDLE - 1900;
-      fake_ent.size = 17 * srchrec_ptr->FUJINET_HANDLE;
+      fake_ent.name = fake_files[srchrec_ptr->fnfile_handle++];
+      fake_ent.mtime.tm_mon = srchrec_ptr->fnfile_handle;
+      fake_ent.mtime.tm_year = 2025 - srchrec_ptr->fnfile_handle - 1900;
+      fake_ent.size = 17 * srchrec_ptr->fnfile_handle;
     }
 #endif
 #ifdef DEBUG
@@ -318,12 +316,12 @@ void fnext(void)
 #endif
     if (!ent) {
 #if defined(DEBUG)
-      consolef("OUT OF ENTRIES %i\n", srchrec_ptr->FNDIR_HANDLE);
+      //consolef("OUT OF ENTRIES %i\n", srchrec_ptr->fndir_handle);
 #endif
 #if DO_FUJI
-      fujifs_closedir(srchrec_ptr->FNDIR_HANDLE);
+      fujifs_closedir(srchrec_ptr->fndir_handle);
 #endif
-      srchrec_ptr->FNDIR_HANDLE = -1;
+      srchrec_ptr->fndir_handle = -1;
       fail(DOSERR_NO_MORE_FILES);
       return;
     }
@@ -334,20 +332,21 @@ void fnext(void)
 #if 0
   if (!contains_wildcards(fcbname_ptr)) {
 #if DO_FUJI
-    fujifs_closedir(srchrec_ptr->FUJINET_HANDLE);
+    fujifs_closedir(srchrec_ptr->fnfile_handle);
 #endif
-    srchrec_ptr->FUJINET_HANDLE = -1;
+    srchrec_ptr->fnfile_handle = -1;
   }
 #endif
 
-  fcbitize(dirrec_ptr->file_name, ent->name);
-  dirrec_ptr->file_attr = ent->isdir ? 0x10/*ATTR_DIRECTORY*/ : 0;
+  fcbitize(dirrec_ptr->fcb_name, ent->name);
+  dirrec_ptr->attr = ent->isdir ? 0x10/*ATTR_DIRECTORY*/ : 0;
   dos_date = (ent->mtime.tm_mday)
     | ((ent->mtime.tm_mon + 1) << 5) | ((ent->mtime.tm_year - 80) << 9);
   dos_time = (ent->mtime.tm_sec / 2)
     | (ent->mtime.tm_min << 5) | (ent->mtime.tm_hour << 11);
-  dirrec_ptr->file_time = (ulong) MK_FP(dos_date, dos_time);
-  dirrec_ptr->file_size = ent->size;
+  dirrec_ptr->time = dos_time;
+  dirrec_ptr->date = dos_date;
+  dirrec_ptr->size = ent->size;
 
   // Does DOS actually look at these fields?
   dirrec_ptr->start_sector = 1;
@@ -356,12 +355,12 @@ void fnext(void)
 }
 
 /* Internal findnext for delete and rename processing */
-uint fnext2(void)
+uint16_t fnext2(void)
 {
-  return (find_next_entry(srchrec_ptr_2->srch_mask, 0x20,
-                          dirrec_ptr_2->file_name, &dirrec_ptr_2->file_attr,
-                          NULL, NULL, NULL, &srchrec_ptr_2->dir_sector,
-                          &srchrec_ptr_2->dir_entry_no)) ? 0 : 18;
+  return (find_next_entry(srchrec_ptr_2->pattern, 0x20,
+                          dirrec_ptr_2->fcb_name, &dirrec_ptr_2->attr,
+                          NULL, NULL, NULL, &srchrec_ptr_2->fndir_handle,
+                          &srchrec_ptr_2->sequence)) ? 0 : 18;
 }
 
 /* FindFirst - subfunction 1Bh */
@@ -400,13 +399,13 @@ void ffirst(void)
 #else
   if ((*srch_attr_ptr) & 0x08/*ATTR_VOLUME_LABEL*/) {
     //consolef("VOLUME\n");
-    srchrec_ptr->drive_no = (our_drive_no + 1) | 0x80;
-    _fmemmove(srchrec_ptr->srch_mask, fcbname_ptr, sizeof(srchrec_ptr->srch_mask));
+    srchrec_ptr->drive_num = (our_drive_no + 1) | 0x80;
+    _fmemmove(srchrec_ptr->pattern, fcbname_ptr, sizeof(srchrec_ptr->pattern));
     srchrec_ptr->attr_mask = *srch_attr_ptr;
-    _fstrcpy(dirrec_ptr->file_name, "FUJINET1234");
-    dirrec_ptr->file_attr = 0x08/*ATTR_VOLUME_LABEL*/;
-    dirrec_ptr->file_time = 0;
-    dirrec_ptr->file_size = 0;
+    _fstrcpy(dirrec_ptr->fcb_name, "FUJINET1234");
+    dirrec_ptr->attr = 0x08/*ATTR_VOLUME_LABEL*/;
+    dirrec_ptr->datetime = 0L;
+    dirrec_ptr->size = 0L;
 
     //dumpHex(search, sizeof(*search), 0);
     //dumpHex(dirrec_ptr, sizeof(*dirrec_ptr), 0);
@@ -416,17 +415,17 @@ void ffirst(void)
   }
 #endif
 
-  _fmemcpy(&srchrec_ptr->srch_mask, fcbname_ptr, 11);
+  _fmemcpy(&srchrec_ptr->pattern, fcbname_ptr, 11);
 
-  if (srchrec_ptr->FNDIR_HANDLE != -1) {
+  if (srchrec_ptr->fndir_handle != -1) {
 #if DO_FUJI
-    fujifs_closedir(srchrec_ptr->FNDIR_HANDLE);
+    fujifs_closedir(srchrec_ptr->fndir_handle);
 #endif
-    srchrec_ptr->FNDIR_HANDLE = -1;
+    srchrec_ptr->fndir_handle = -1;
   }
-  srchrec_ptr->dir_entry_no = -1;
+  srchrec_ptr->sequence = -1;
   srchrec_ptr->attr_mask = *srch_attr_ptr;
-  srchrec_ptr->drive_no = (uchar) (our_drive_no | 0xC0);
+  srchrec_ptr->drive_num = (uint8_t) (our_drive_no | 0xC0);
 
   fnext();
 #ifdef DEBUG
@@ -439,13 +438,13 @@ void ffirst(void)
 }
 
 /* Internal findfirst for delete and rename processing */
-uint ffirst2(void)
+uint16_t ffirst2(void)
 {
-  if (!get_dir_start_sector(filename_ptr_2, &srchrec_ptr_2->dir_sector))
+  if (!get_dir_start_sector(filename_ptr_2, &srchrec_ptr_2->fndir_handle))
     return 3;
 
-  srchrec_ptr_2->dir_entry_no = -1;
-  srchrec_ptr_2->drive_no = (uchar) (our_drive_no | 0x80);
+  srchrec_ptr_2->sequence = -1;
+  srchrec_ptr_2->drive_num = (uint8_t) (our_drive_no | 0x80);
 
   return fnext2();
 }
@@ -466,7 +465,7 @@ void rd(void)
   *srch_attr_ptr = 0x10;
 
   ffirst();
-  if (r.ax || (!(dirrec_ptr->file_attr & 0x10))) {
+  if (r.ax || (!(dirrec_ptr->attr & 0x10))) {
     r.ax = 3;
     return;
   }
@@ -476,7 +475,7 @@ void rd(void)
     return;
   }
 
-  _fmemset(srchrec_ptr_2->srch_mask, '?', 11);
+  _fmemset(srchrec_ptr_2->pattern, '?', 11);
   srchrec_ptr_2->attr_mask = 0x3f;
 
   if ((r.ax = ffirst2()) == 3) {
@@ -489,11 +488,11 @@ void rd(void)
     return;
   }
 
-  if (!get_sector(last_sector = srchrec_ptr->dir_sector, sector_buffer)) {
+  if (!get_sector(last_sector = srchrec_ptr->fndir_handle, sector_buffer)) {
     fail(5);
     return;
   }
-  ((DIRREC_PTR) sector_buffer)[srchrec_ptr->dir_entry_no].file_name[0] = (char) 0xE5;
+  ((DIRREC_PTR) sector_buffer)[srchrec_ptr->sequence].fcb_name[0] = (char) 0xE5;
   if (  /* dirsector_has_entries(last_sector, sector_buffer) && */
        (!put_sector(last_sector, sector_buffer))) {
     fail(5);
@@ -546,7 +545,7 @@ void md(void)
   set_next_sector(dirrec_ptr->start_sector, 0xFFFF);
   last_sector = dirrec_ptr->start_sector;
   if ((!put_sector(dirrec_ptr->start_sector, sector_buffer)) ||
-      (!create_dir_entry(&srchrec_ptr->dir_sector, NULL, fcbname_ptr, 0x10,
+      (!create_dir_entry(&srchrec_ptr->fndir_handle, NULL, fcbname_ptr, 0x10,
                          dirrec_ptr->start_sector, 0, dos_ftime()))) {
     fail(5);
     return;
@@ -568,7 +567,7 @@ void cd(void)
 
     *srch_attr_ptr = 0x10;
     ffirst();
-    if (r.ax || (!(dirrec_ptr->file_attr & 0x10))) {
+    if (r.ax || (!(dirrec_ptr->attr & 0x10))) {
       fail(3);
       return;
     }
@@ -589,24 +588,24 @@ void clsfil(void)
   if (!(p->open_mode & 3))
     return;
 
-  if (p->dir_entry_no == 0xff) {
-    if (!create_dir_entry(&p->dir_sector, &p->dir_entry_no, p->file_name,
-                          p->file_attr, p->start_sector, p->file_size, p->file_time))
+  if (p->sequence == 0xff) {
+    if (!create_dir_entry(&p->fndir_handle, &p->sequence, p->name,
+                          p->attr, p->start_sector, p->file_size, p->file_time))
       fail(5);
   }
   else {
-    if ((last_sector != p->dir_sector) && (!get_sector(p->dir_sector, sector_buffer)))
+    if ((last_sector != p->fndir_handle) && (!get_sector(p->fndir_handle, sector_buffer)))
       fail(5);
-    last_sector = p->dir_sector;
-    ((DIRREC_PTR) sector_buffer)[p->dir_entry_no].file_attr = p->file_attr;
-    ((DIRREC_PTR) sector_buffer)[p->dir_entry_no].start_sector = p->start_sector;
-    ((DIRREC_PTR) sector_buffer)[p->dir_entry_no].file_size = p->file_size;
-    ((DIRREC_PTR) sector_buffer)[p->dir_entry_no].file_time = p->file_time;
-    if (!put_sector(p->dir_sector, sector_buffer))
+    last_sector = p->fndir_handle;
+    ((DIRREC_PTR) sector_buffer)[p->sequence].attr = p->attr;
+    ((DIRREC_PTR) sector_buffer)[p->sequence].start_sector = p->start_sector;
+    ((DIRREC_PTR) sector_buffer)[p->sequence].file_size = p->file_size;
+    ((DIRREC_PTR) sector_buffer)[p->sequence].file_time = p->file_time;
+    if (!put_sector(p->fndir_handle, sector_buffer))
       fail(5);
   }
 #else
-  fujifs_close(p->FNSFT_HANDLE);
+  fujifs_close(p->fnfile_handle);
 #endif  
 }
 
@@ -631,23 +630,23 @@ void readfil(void)
 
 #if 0
   if ((p->file_pos + r.cx) > p->file_size)
-    r.cx = (uint) (p->file_size - p->file_pos);
+    r.cx = (uint16_t) (p->file_size - p->file_pos);
 
   if (!r.cx)
     return;
 
   /* Fill caller's buffer and update the SFT for the file */
-  read_data(&p->file_pos, &r.cx, ((V3_SDA_PTR) sda_ptr)->current_dta,
+  read_data(&p->file_pos, &r.cx, ((SDA_PTR_V3) sda_ptr)->current_dta,
             p->start_sector, &p->rel_sector, &p->abs_sector);
 #else
 #if DO_FUJI
-  consolef("REQUESTING %i from %i\n", r.cx, p->FNSFT_HANDLE);
-  r.cx = fujifs_read(p->FNSFT_HANDLE, ((V3_SDA_PTR) sda_ptr)->current_dta, r.cx);
+  consolef("REQUESTING %i from %i\n", r.cx, p->fnfile_handle);
+  r.cx = fujifs_read(p->fnfile_handle, ((SDA_PTR_V3) sda_ptr)->current_dta, r.cx);
 #else
   if (p->file_pos >= r.cx)
     r.cx = 20;
 #endif
-  p->file_pos += r.cx;
+  p->pos += r.cx;
 #endif
 #if 0 && defined(DEBUG)
   consolef("SFT: %i\n", r.cx);
@@ -667,20 +666,20 @@ void writfil(void)
     return;
   }
 
-  p->file_time = dos_ftime();
+  p->datetime = dos_ftime();
 
-  /* Take account of DOS' 0-byte-write-truncates-file rcounte */
+  /* Take account of DOS' 0-byte-write-truncates-file counter */
   if (!r.cx) {
-    p->file_size = p->file_pos;
-    chop_file(p->file_pos, &p->start_sector, &p->rel_sector, &p->abs_sector);
+    p->size = p->pos;
+    chop_file(p->pos, &p->fnfile_handle, &p->rel_sector, &p->abs_sector);
     return;
   }
 
   /* Write from the caller's buffer and update the SFT for the file */
-  write_data(&p->file_pos, &r.cx, ((V3_SDA_PTR) sda_ptr)->current_dta,
-             &p->start_sector, &p->rel_sector, &p->abs_sector);
-  if (p->file_pos > p->file_size)
-    p->file_size = p->file_pos;
+  write_data(&p->pos, &r.cx, ((SDA_PTR_V3) sda_ptr)->current_dta,
+             &p->fnfile_handle, &p->rel_sector, &p->abs_sector);
+  if (p->pos > p->size)
+    p->size = p->pos;
 }
 
 /* Lock file - subfunction 0Ah */
@@ -693,15 +692,15 @@ void lockfil(void)
 {
   SFTREC_PTR sft = (SFTREC_PTR) MK_FP(r.es, r.di);
   LOCKREC_PTR lockptr;
-  ulong region_offset;
-  ulong region_length;
+  uint32_t region_offset;
+  uint32_t region_length;
 
   if (_osmajor > 3) {
     // In v4.0 and above, lock info is at DS:BX in a LOCKREC structure
     lockptr = (LOCKREC_PTR) MK_FP(r.ds, r.dx);
     region_offset = lockptr->region_offset;
     region_length = lockptr->region_length;
-    if ((uchar) r.bx)   // if BL == 1, UNLOCK
+    if ((uint8_t) r.bx)   // if BL == 1, UNLOCK
     {
       // Call UNLOCK REGION function
     }
@@ -712,8 +711,8 @@ void lockfil(void)
   }
   else {
     // In v3.x, lock info is in regs and on the stack
-    region_offset = ((ulong) r.cx << 16) + r.dx;
-    region_length = ((ulong) r.si << 16) + *stack_param_ptr;
+    region_offset = ((uint32_t) r.cx << 16) + r.dx;
+    region_length = ((uint32_t) r.si << 16) + *stack_param_ptr;
 
     // Call LOCK REGION function
   }
@@ -727,12 +726,12 @@ void lockfil(void)
 void unlockfil(void)
 {
   SFTREC_PTR sft = (SFTREC_PTR) MK_FP(r.es, r.di);
-  ulong region_offset;
-  ulong region_length;
+  uint32_t region_offset;
+  uint32_t region_length;
 
   // In v3.x, lock info is in regs and on the stack
-  region_offset = ((ulong) r.cx << 16) + r.dx;
-  region_length = ((ulong) r.si << 16) + *stack_param_ptr;
+  region_offset = ((uint32_t) r.cx << 16) + r.dx;
+  region_length = ((uint32_t) r.si << 16) + *stack_param_ptr;
 
   // Call UNLOCK REGION function
 
@@ -761,7 +760,7 @@ void getfatt(void)
   if (r.ax)
     return;
 
-  r.ax = (uint) dirrec_ptr->file_attr;
+  r.ax = (uint16_t) dirrec_ptr->attr;
 }
 
 /* Set File Attributes - subfunction 0Eh */
@@ -771,13 +770,13 @@ void setfatt()
   if (r.flags & FCARRY)
     return;
 
-  if ((((uchar) *stack_param_ptr) & 0x10) ||
-      (((DIRREC_PTR) sector_buffer)[srchrec_ptr->dir_entry_no].file_attr & 0x10)) {
+  if ((((uint8_t) *stack_param_ptr) & 0x10) ||
+      (((DIRREC_PTR) sector_buffer)[srchrec_ptr->sequence].attr & 0x10)) {
     fail(5);
     return;
   }
 
-  ((DIRREC_PTR) sector_buffer)[srchrec_ptr->dir_entry_no].file_attr = (uchar) *stack_param_ptr;
+  ((DIRREC_PTR) sector_buffer)[srchrec_ptr->sequence].attr = (uint8_t) *stack_param_ptr;
   if (!put_sector(last_sector, sector_buffer)) {
     fail(5);
     return;
@@ -788,7 +787,7 @@ void setfatt()
 void renfil(void)
 {
   char far *path;
-  uint ret = 0, dir_sector;
+  uint16_t ret = 0, fndir_handle;
   int i = 0, j;
 
   *srch_attr_ptr = 0x21;
@@ -815,7 +814,7 @@ void renfil(void)
     default:
       fcbname_ptr_2[i++] = *path;
     }
-  _fmemcpy(srchrec_ptr_2->srch_mask, fcbname_ptr_2, 11);
+  _fmemcpy(srchrec_ptr_2->pattern, fcbname_ptr_2, 11);
   if ((ret = ffirst2()) == 3) {
     fail(3);
     return;
@@ -826,27 +825,27 @@ void renfil(void)
   }
 
   ret = 0;
-  dir_sector = srchrec_ptr_2->dir_sector;
+  fndir_handle = srchrec_ptr_2->fndir_handle;
 
   while (!r.ax) {
     for (i = 0; i < 11; i++)
-      srchrec_ptr_2->srch_mask[i] = (fcbname_ptr_2[i] == '?')
-        ? dirrec_ptr->file_name[i]
+      srchrec_ptr_2->pattern[i] = (fcbname_ptr_2[i] == '?')
+        ? dirrec_ptr->fcb_name[i]
         : fcbname_ptr_2[i];
-    if ((dirrec_ptr->file_attr & 1) || (!ffirst2()))
+    if ((dirrec_ptr->attr & 1) || (!ffirst2()))
       ret = 5;
     else {
-      if (!create_dir_entry(&dir_sector, NULL, srchrec_ptr_2->srch_mask,
-                            dirrec_ptr->file_attr, dirrec_ptr->start_sector,
-                            dirrec_ptr->file_size, dirrec_ptr->file_time))
+      if (!create_dir_entry(&fndir_handle, NULL, srchrec_ptr_2->pattern,
+                            dirrec_ptr->attr, dirrec_ptr->start_sector,
+                            dirrec_ptr->size, dirrec_ptr->datetime))
         ret = 5;
       else {
-        if (!get_sector(last_sector = srchrec_ptr->dir_sector, sector_buffer)) {
+        if (!get_sector(last_sector = srchrec_ptr->fndir_handle, sector_buffer)) {
           fail(5);
           return;
         }
-        ((DIRREC_PTR) sector_buffer)[srchrec_ptr->dir_entry_no].file_name[0] = (char) 0xE5;
-        if (!put_sector(srchrec_ptr->dir_sector, sector_buffer)) {
+        ((DIRREC_PTR) sector_buffer)[srchrec_ptr->sequence].fcb_name[0] = (char) 0xE5;
+        if (!put_sector(srchrec_ptr->fndir_handle, sector_buffer)) {
           fail(5);
           return;
         }
@@ -867,17 +866,17 @@ void renfil(void)
 /* Delete File - subfunction 13h */
 void delfil(void)
 {
-  uint ret = 0;
+  uint16_t ret = 0;
 
   *srch_attr_ptr = 0x21;
   ffirst();
 
   while (!r.ax) {
-    if (dirrec_ptr->file_attr & 1)
+    if (dirrec_ptr->attr & 1)
       ret = 5;
     else {
       FREE_SECTOR_CHAIN(dirrec_ptr->start_sector);
-      ((DIRREC_PTR) sector_buffer)[srchrec_ptr->dir_entry_no].file_name[0] = (char) 0xE5;
+      ((DIRREC_PTR) sector_buffer)[srchrec_ptr->sequence].fcb_name[0] = (char) 0xE5;
       if (      /* dirsector_has_entries(last_sector, sector_buffer) && */
            (!put_sector(last_sector, sector_buffer))) {
         fail(5);
@@ -913,8 +912,8 @@ void init_sft(SFTREC_PTR p)
     p->open_mode &= 0x000F;
 
   /* Mark file as being on network drive, unwritten to */
-  p->dev_info_word = (uint) (0x8040 | (uint) our_drive_no);
-  p->file_pos = 0;
+  p->dev_info_word = (uint16_t) (0x8040 | (uint16_t) our_drive_no);
+  p->pos = 0;
   p->rel_sector = 0xffff;
   p->abs_sector = 0xffff;
   p->dev_drvr_ptr = NULL;
@@ -932,31 +931,31 @@ void init_sft(SFTREC_PTR p)
 
 void fill_sft(SFTREC_PTR p, int use_found_1, int truncate)
 {
-  _fmemcpy(p->file_name, fcbname_ptr, 11);
+  _fmemcpy(p->fcb_name, fcbname_ptr, 11);
   if (use_found_1) {
-    p->file_attr = dirrec_ptr->file_attr;
-    p->file_time = truncate ? dos_ftime() : dirrec_ptr->file_time;
+    p->attr = dirrec_ptr->attr;
+    p->datetime = truncate ? dos_ftime() : dirrec_ptr->datetime;
     if (truncate) {
       FREE_SECTOR_CHAIN(dirrec_ptr->start_sector);
-      p->start_sector = 0xFFFF;
+      p->fnfile_handle = 0xFFFF;
     }
 #if 0
     else
-      p->start_sector = dirrec_ptr->start_sector;
+      p->fnfile_handle = dirrec_ptr->fnfile_handle;
 #endif
-    p->file_size = truncate ? 0L : dirrec_ptr->file_size;
-    p->dir_sector = srchrec_ptr->dir_sector;
-    p->dir_entry_no = (uchar) srchrec_ptr->dir_entry_no;
+    p->size = truncate ? 0L : dirrec_ptr->size;
+    p->fnfile_handle = 0;//srchrec_ptr->fndir_handle;
+    p->sequence = (uint8_t) srchrec_ptr->sequence;
   }
   else {
-    p->file_attr = (uchar) *stack_param_ptr;   /* Attr is top of stack */
-    p->file_time = dos_ftime();
-    p->start_sector = 0xffff;
-    p->file_size = 0;
+    p->attr = (uint8_t) *stack_param_ptr;   /* Attr is top of stack */
+    p->datetime = dos_ftime();
+    p->fnfile_handle = 0xffff;
+    p->size = 0;
 #ifndef DO_FUJI
-    p->dir_sector = srchrec_ptr->dir_sector;
+    p->fndir_handle = srchrec_ptr->fndir_handle;
 #endif
-    p->dir_entry_no = 0xff;
+    p->sequence = 0xff;
   }
 }
 
@@ -997,7 +996,7 @@ void creatfil(void)
   if ((r.flags & FCARRY) && (r.ax != 2))
     return;
 
-  if ((!r.ax) && (dirrec_ptr->file_attr & 0x19)) {
+  if ((!r.ax) && (dirrec_ptr->attr & 0x19)) {
     fail(5);
     return;
   }
@@ -1016,12 +1015,12 @@ void skfmend(void)
   /* But, just in case... */
   seek_amnt = -1L * (((long) r.cx << 16) + r.dx);
   p = (SFTREC_PTR) MK_FP(r.es, r.di);
-  if (seek_amnt > p->file_size)
-    seek_amnt = p->file_size;
+  if (seek_amnt > p->size)
+    seek_amnt = p->size;
 
-  p->file_pos = p->file_size - seek_amnt;
-  r.dx = (uint) (p->file_pos >> 16);
-  r.ax = (uint) (p->file_pos & 0xFFFF);
+  p->pos = p->size - seek_amnt;
+  r.dx = (uint16_t) (p->pos >> 16);
+  r.ax = (uint16_t) (p->pos & 0xFFFF);
 }
 
 void unknown_fxn_2D()
@@ -1039,10 +1038,10 @@ void unknown_fxn_2D()
 void special_opnfil(void)
 {
   SFTREC_PTR p = (SFTREC_PTR) MK_FP(r.es, r.di);
-  uint open_mode, action;
+  uint16_t open_mode, action;
 
-  open_mode = ((V4_SDA_PTR) sda_ptr)->mode_2E & 0x7f;
-  action = ((V4_SDA_PTR) sda_ptr)->action_2E;
+  open_mode = ((SDA_PTR_V4) sda_ptr)->mode_2E & 0x7f;
+  action = ((SDA_PTR_V4) sda_ptr)->action_2E;
   p->open_mode = open_mode;
 
   if (contains_wildcards(fcbname_ptr)) {
@@ -1071,16 +1070,16 @@ void special_opnfil(void)
       return;
     }
 
-    p->FNSFT_HANDLE = handle;
-    consolef("FN OPEN_EXTENDED assigned %i\n", p->FNSFT_HANDLE);
+    p->fnfile_handle = handle;
+    consolef("FN OPEN_EXTENDED assigned %i\n", p->fnfile_handle);
   }
 #else
   if ((r.flags & FCARRY) && (r.ax != 2))
     return;
 
   if (!r.ax) {
-    if ((dirrec_ptr->file_attr & 0x18) ||
-        ((dirrec_ptr->file_attr & 0x01) && (open_mode & 3)) || (!(action &= 0x000F))) {
+    if ((dirrec_ptr->attr & 0x18) ||
+        ((dirrec_ptr->attr & 0x01) && (open_mode & 3)) || (!(action &= 0x000F))) {
       fail(5);
       return;
     }
@@ -1187,16 +1186,16 @@ void get_fcbname_from_path(char far *path, char far *fcbname)
    the filename is a DOS character device. We will 'Access deny' any
    use of a char device explicitly directed to our drive */
 
-void generate_fcbname(uint dos_ds)
+void generate_fcbname(uint16_t dos_ds)
 {
   get_fcbname_from_path((char far *) (_fstrrchr(filename_ptr, '\\') + 1), fcbname_ptr);
 
   filename_is_char_device = is_a_character_device(dos_ds);
 }
 
-int is_call_for_us(uint es, uint di, uint ds)
+int is_call_for_us(uint16_t es, uint16_t di, uint16_t ds)
 {
-  uchar far *p;
+  uint8_t far *p;
   int ret = 0xFF;
 
   filename_is_char_device = 0;
@@ -1220,16 +1219,16 @@ int is_call_for_us(uint es, uint di, uint ds)
         SRCHREC_PTR psrchrec;   // check search record in SDA
 
         if (_osmajor == 3)
-          psrchrec = &(((V3_SDA_PTR) sda_ptr)->srchrec);
+          psrchrec = &(((SDA_PTR_V3) sda_ptr)->srchrec);
         else
-          psrchrec = &(((V4_SDA_PTR) sda_ptr)->srchrec);
-        return ((psrchrec->drive_no & (uchar) 0x40) &&
-                ((psrchrec->drive_no & (uchar) 0x1F) == our_drive_no));
+          psrchrec = &(((SDA_PTR_V4) sda_ptr)->srchrec);
+        return ((psrchrec->drive_num & (uint8_t) 0x40) &&
+                ((psrchrec->drive_num & (uint8_t) 0x1F) == our_drive_no));
       }
       if (_osmajor == 3)
-        p = ((V3_SDA_PTR) sda_ptr)->cdsptr;     // check CDS
+        p = ((SDA_PTR_V3) sda_ptr)->cdsptr;     // check CDS
       else
-        p = ((V4_SDA_PTR) sda_ptr)->cdsptr;
+        p = ((SDA_PTR_V4) sda_ptr)->cdsptr;
 
       if (_fmemcmp(cds_path_root, p, cds_root_size) == 0) {
         // If a path is present, does it refer to a character device
@@ -1252,15 +1251,15 @@ int is_call_for_us(uint es, uint di, uint ds)
 
 void interrupt far redirector(ALL_REGS entry_regs)
 {
-  static uint save_bp;
-  uint our_ss, our_sp, cur_ss, cur_sp;
+  static uint16_t save_bp;
+  uint16_t our_ss, our_sp, cur_ss, cur_sp;
 
   _asm STI;
 
-  if (((entry_regs.ax >> 8) != (uchar) 0x11) || ((uchar) entry_regs.ax > MAX_FXN_NO))
+  if (((entry_regs.ax >> 8) != (uint8_t) 0x11) || ((uint8_t) entry_regs.ax > MAX_FXN_NO))
     goto chain_on;
 
-  curr_fxn = fxnmap[(uchar) entry_regs.ax];
+  curr_fxn = fxnmap[(uint8_t) entry_regs.ax];
 
   if ((curr_fxn == _unsupported) ||
       (!is_call_for_us(entry_regs.es, entry_regs.di, entry_regs.ds)))
@@ -1275,7 +1274,7 @@ void interrupt far redirector(ALL_REGS entry_regs)
   _asm mov dos_ss, ss;
   _asm mov save_bp, bp;
 
-  stack_param_ptr = (uint far *) MK_FP(dos_ss, save_bp + sizeof(ALL_REGS));
+  stack_param_ptr = (uint16_t far *) MK_FP(dos_ss, save_bp + sizeof(ALL_REGS));
 
   cur_ss = getSS();
   cur_sp = getSP();
@@ -1315,7 +1314,6 @@ void interrupt far redirector(ALL_REGS entry_regs)
   // Expect success!
   succeed();
 
-#define DEBUG_DISPATCH
 #if defined(DEBUG_DISPATCH) && defined(DEBUG)
   consolef("DISPATCH IN 0x%02x\n", curr_fxn);
 #endif

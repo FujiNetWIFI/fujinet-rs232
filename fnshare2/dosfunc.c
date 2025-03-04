@@ -4,11 +4,11 @@
 /* ------------------- Internal DOS calls ------------ */
 
 #if 0
-uint r_es, r_di, r_ds;
+uint16_t r_es, r_di, r_ds;
 #endif
-uint result_lo, result_hi;
+uint16_t result_lo, result_hi;
 
-ulong dos_ftime(void)
+uint32_t dos_ftime(void)
 {
 #if 0
   r_es = r.es, r_di = r.di, r_ds = r.ds;
@@ -43,7 +43,7 @@ ulong dos_ftime(void)
 #warning getting the time does not work
 #endif
 
-  return (ulong) MK_FP(result_hi, result_lo);
+  return (uint32_t) MK_FP(result_hi, result_lo);
 }
 
 void set_sft_owner(SFTREC_PTR sft)
@@ -79,7 +79,7 @@ void set_sft_owner(SFTREC_PTR sft)
 }
 
 // Does fcbname_ptr point to a device name?
-int is_a_character_device(uint dos_ds)
+int is_a_character_device(uint16_t dos_ds)
 {
   int result;
 

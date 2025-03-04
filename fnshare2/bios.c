@@ -25,11 +25,11 @@ void print_string(char far *str, int add_newline)
   }
 }
 
-char *my_ltoa(ulong num)
+char *my_ltoa(uint32_t num)
 {
   static char buf[11] = "0000000000";
   int i;
-  ulong tmp;
+  uint32_t tmp;
 
   buf[10] = 0;
   for (i = 0; i < 10; i++) {
@@ -42,7 +42,7 @@ char *my_ltoa(ulong num)
   return (char *) &buf[9 - i];
 }
 
-char *my_hex(ulong num, int len)
+char *my_hex(uint32_t num, int len)
 {
   static char buf[9];
   static char *hex = "0123456789ABCDEF";

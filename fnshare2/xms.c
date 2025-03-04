@@ -5,13 +5,14 @@
 
 /* XMS memory copy structure */
 typedef struct {
-  ulong copy_len;               /* must be EVEN */
-  uint srce_hndle;              /* source handle */
-  ulong srce_ofs;               /* offset in source block */
-  uint dest_hndle;              /* dest handle */
-  ulong dest_ofs;               /* offset in dest block */
+  uint32_t copy_len;               /* must be EVEN */
+  uint16_t srce_hndle;              /* source handle */
+  uint32_t srce_ofs;               /* offset in source block */
+  uint16_t dest_hndle;              /* dest handle */
+  uint32_t dest_ofs;               /* offset in dest block */
 } XMSCOPY, *XMSCOPY_PTR;
 
+typedef int (far *FARPROC)(void);
 FARPROC xms_entrypoint = NULL;  /* obtained from Int 2fh/4310h */
 
 /* ------- XMS functions ------------------------------- */
@@ -53,7 +54,7 @@ int xms_is_present(void)
 
 /* Return size of largest free block. Return 0 if error
         Ignore the 'No return value' compiler warning for this function. */
-uint xms_kb_avail(void)
+uint16_t xms_kb_avail(void)
 {
   _asm {
     mov ah, 0x08;
@@ -62,10 +63,10 @@ uint xms_kb_avail(void)
 }
 
 /* Allocate a chunk of XMS and return a handle */
-int xms_alloc_block(uint block_size, uint *handle_ptr)
+int xms_alloc_block(uint16_t block_size, uint16_t *handle_ptr)
 {
   int success = FALSE;
-  uint handle, result;
+  uint16_t handle, result;
 
   _asm {
     mov ah, 0x09;
@@ -84,7 +85,7 @@ int xms_alloc_block(uint block_size, uint *handle_ptr)
 }
 
 /* free XMS memory previously allocated */
-int xms_free_block(uint handle)
+int xms_free_block(uint16_t handle)
 {
   int success = FALSE;
 
@@ -109,10 +110,10 @@ int xms_free_block(uint handle)
 // Only used by xms_copy() but doesn't work as stack/local var
 static XMSCOPY xms;
 
-int xms_copy(uint source, ulong source_offset, uint dest, ulong dest_offset, ulong length)
+int xms_copy(uint16_t source, uint32_t source_offset, uint16_t dest, uint32_t dest_offset, uint32_t length)
 {
-  uint result;
-  uchar err;
+  uint16_t result;
+  uint8_t err;
   void *xms_ptr = &xms;
 
 

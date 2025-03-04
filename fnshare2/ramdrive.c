@@ -14,21 +14,21 @@ extern int match_to_mask(char far *mask, char far *filename);
 #define         FATPAGE_SIZE            128
 #define         MIN_DISK_SIZE           128     // Don't load unless 128kb XMS free
 
-uint xms_handle = 0;            /* Handle of XMS allocation for disk */
-uint disk_size = DEF_DISK_SIZE; /* size of XMS allocation for disk */
-uint total_sectors;             /* total 1k sectors on XMS disk */
-uint free_sectors;              /* unallocated sectors on XMS disk */
-uchar sector_buffer[SECTOR_SIZE];       /* general purpose sector buffer */
-ulong FAT_location;             /* offset within XMS allocation of disk FAT */
-uint FAT_page[FATPAGE_SIZE];    /* buffer for FAT entries */
+uint16_t xms_handle = 0;            /* Handle of XMS allocation for disk */
+uint16_t disk_size = DEF_DISK_SIZE; /* size of XMS allocation for disk */
+uint16_t total_sectors;             /* total 1k sectors on XMS disk */
+uint16_t free_sectors;              /* unallocated sectors on XMS disk */
+uint8_t sector_buffer[SECTOR_SIZE];       /* general purpose sector buffer */
+uint32_t FAT_location;             /* offset within XMS allocation of disk FAT */
+uint16_t FAT_page[FATPAGE_SIZE];    /* buffer for FAT entries */
 int cur_FAT_page = -1;          /* index of FAT page in buffer */
 int FAT_page_dirty = FALSE;     /* Has current FAT page been updated */
-uint last_sector = 0xffff;      /* last sector read into sector buffer */
+uint16_t last_sector = 0xffff;      /* last sector read into sector buffer */
 
 /* Check that the page of FAT entries for the supplied sector is in
         the buffer. If it isn't, go get it, but write back the currently
         buffered page first if it has been updated. */
-int check_FAT_page(uint abs_sector)
+int check_FAT_page(uint16_t abs_sector)
 {
   int page = (int) (abs_sector / FATPAGE_SIZE);
 
@@ -36,12 +36,12 @@ int check_FAT_page(uint abs_sector)
     if (FAT_page_dirty &&
         (!xms_copy_fm_real(xms_handle,
                            FAT_location + (cur_FAT_page * (FATPAGE_SIZE * 2)),
-                           FATPAGE_SIZE * 2, (uchar far *) FAT_page)))
+                           FATPAGE_SIZE * 2, (uint8_t far *) FAT_page)))
       return FALSE;
 
     if (!xms_copy_to_real(xms_handle,
                           FAT_location + (page * (FATPAGE_SIZE * 2)), FATPAGE_SIZE * 2,
-                          (uchar far *) FAT_page))
+                          (uint8_t far *) FAT_page))
       return FALSE;
     cur_FAT_page = page;
     FAT_page_dirty = FALSE;
@@ -51,7 +51,7 @@ int check_FAT_page(uint abs_sector)
 
 /* Use the FAT to find the next sector in the chain for the current
         file/directory */
-uint next_FAT_sector(uint abs_sector)
+uint16_t next_FAT_sector(uint16_t abs_sector)
 {
   if (!check_FAT_page(abs_sector))
     return 0;
@@ -61,9 +61,9 @@ uint next_FAT_sector(uint abs_sector)
 
 /* Update the FAT entry for this sector to reflect the next sector
         in the chain for the current file/directory */
-uint set_next_sector(uint abs_sector, uint next_sector)
+uint16_t set_next_sector(uint16_t abs_sector, uint16_t next_sector)
 {
-  uint save_sector;
+  uint16_t save_sector;
 
   if (!check_FAT_page(abs_sector))
     return 0;
@@ -83,10 +83,10 @@ uint set_next_sector(uint abs_sector, uint next_sector)
 /* Find a free sector on the disk. Use the same algorithm as
         DOS, which is to continue looking from where the last free
         sector was found and allocated. */
-uint next_free_sector(void)
+uint16_t next_free_sector(void)
 {
-  static uint prev_sector = 0;
-  uint save_sector = prev_sector;
+  static uint16_t prev_sector = 0;
+  uint16_t save_sector = prev_sector;
 
   for (;;) {
     if (++prev_sector == total_sectors)
@@ -114,8 +114,8 @@ uint next_free_sector(void)
 
 void set_up_xms_disk(void)
 {
-  ulong count, ofs;
-  uint len;
+  uint32_t count, ofs;
+  uint16_t len;
 
 
   if (!xms_is_present())
@@ -126,8 +126,8 @@ void set_up_xms_disk(void)
 
   // The allocation is made up of n sectors and
   // n FAT entries (2 bytes each for our 16-bit FAT)
-  free_sectors = total_sectors = (uint)
-    (((ulong) disk_size * 1024) / (SECTOR_SIZE + 2));
+  free_sectors = total_sectors = (uint16_t)
+    (((uint32_t) disk_size * 1024) / (SECTOR_SIZE + 2));
 
   // A little wasted here, but the accurate calculation would soak up
   // TSR code space.
@@ -135,44 +135,44 @@ void set_up_xms_disk(void)
     failprog("XMS allocation error.");
 
   free_sectors--;
-  FAT_location = (ulong) total_sectors *SECTOR_SIZE;
+  FAT_location = (uint32_t) total_sectors *SECTOR_SIZE;
 
   // First FAT entry belongs to the root directory, which,
   // unlike DOS, we keep in the data area, and which always starts at
   // sector 0. (We do not have to worry about disk defraggers and the
   // like).
-  count = (ulong) total_sectors *2;
+  count = (uint32_t) total_sectors *2;
 
   ofs = FAT_location;
 
   memset(sector_buffer, 0, sizeof(sector_buffer));
   // Claim the first sector as used for the root directory.
-  sector_buffer[0] = sector_buffer[1] = (uchar) 0xff;
+  sector_buffer[0] = sector_buffer[1] = (uint8_t) 0xff;
 
   while (count > 0) {
-    len = (uint) min(count, SECTOR_SIZE);
-    if (!xms_copy_fm_real(xms_handle, ofs, len, (uchar far *) sector_buffer))
+    len = (uint16_t) min(count, SECTOR_SIZE);
+    if (!xms_copy_fm_real(xms_handle, ofs, len, (uint8_t far *) sector_buffer))
       failprog("XMS error.");
     count -= len;
     ofs += len;
     sector_buffer[0] = sector_buffer[1] = 0;
   }
 
-  memset(((DIRREC *) sector_buffer)->file_name, ' ', 11);
-  memcpy(((DIRREC *) sector_buffer)->file_name, "PHANTOM", 7);
-  ((DIRREC *) sector_buffer)->file_attr = 0x08;
-  ((DIRREC *) sector_buffer)->file_time = dos_ftime();
-  if (!xms_copy_fm_real(xms_handle, 0, SECTOR_SIZE, (uchar far *) sector_buffer))
+  memset(((DIRREC *) sector_buffer)->fcb_name, ' ', DOS_FCBNAME_LEN);
+  memcpy(((DIRREC *) sector_buffer)->fcb_name, "PHANTOM", 7);
+  ((DIRREC *) sector_buffer)->attr = 0x08;
+  ((DIRREC *) sector_buffer)->datetime = dos_ftime();
+  if (!xms_copy_fm_real(xms_handle, 0, SECTOR_SIZE, (uint8_t far *) sector_buffer))
     failprog("XMS error.");
 }
 
 /* Find the sector number of the start of the directory entries
         for the supplied path */
 
-int get_dir_start_sector(char far *path, uint far *abs_sector_ptr)
+int get_dir_start_sector(char far *path, uint16_t far *abs_sector_ptr)
 {
-  char fcbname[11];
-  uint abs_sector = 0;
+  char fcbname[DOS_FCBNAME_LEN];
+  uint16_t abs_sector = 0;
   DIRREC *dr = (DIRREC *) sector_buffer;
   char far *next_dir;
   char far *path_end = path + _fstrlen(path);
@@ -188,12 +188,12 @@ int get_dir_start_sector(char far *path, uint far *abs_sector_ptr)
         return FALSE;
       last_sector = abs_sector;
       for (i = 0; i < DIRREC_PER_SECTOR; i++) {
-        if (dr[i].file_name[0] == (char) 0xE5)
+        if (dr[i].fcb_name[0] == (char) 0xE5)
           continue;
-        if (!dr[i].file_name[0])
+        if (!dr[i].fcb_name[0])
           i = DIRREC_PER_SECTOR;
-        else if (match_to_mask(dr[i].file_name, fcbname)) {
-          if (!(dr[i].file_attr & 0x10))
+        else if (match_to_mask(dr[i].fcb_name, fcbname)) {
+          if (!(dr[i].attr & 0x10))
             return FALSE;
           abs_sector = dr[i].start_sector;
           path = next_dir;
@@ -215,14 +215,14 @@ int get_dir_start_sector(char far *path, uint far *abs_sector_ptr)
    continuing from the supplied starting position (from the previous
    find) */
 
-int find_next_entry(char far *mask, uchar attr_mask, char far *filename,
-                    uchar far *attr_ptr, ulong far *file_time_ptr,
-                    uint far *start_sec_ptr, long far *file_size_ptr,
-                    uint far *dir_sector_ptr, uint far *dir_entryno_ptr)
+int find_next_entry(char far *mask, uint8_t attr_mask, char far *filename,
+                    uint8_t far *attr_ptr, uint32_t far *file_time_ptr,
+                    uint16_t far *start_sec_ptr, uint32_t far *file_size_ptr,
+                    uint16_t far *dir_sector_ptr, uint16_t far *dir_entryno_ptr)
 {
   DIRREC *dr = (DIRREC *) sector_buffer;
   int i = *dir_entryno_ptr + 1;
-  uint abs_sector = *dir_sector_ptr;
+  uint16_t abs_sector = *dir_sector_ptr;
 
   for (;;) {
     if (abs_sector != last_sector)
@@ -231,26 +231,26 @@ int find_next_entry(char far *mask, uchar attr_mask, char far *filename,
       else
         last_sector = abs_sector;
     for (; i < DIRREC_PER_SECTOR; i++) {
-      if (!dr[i].file_name[0])
+      if (!dr[i].fcb_name[0])
         return FALSE;
-      if (dr[i].file_name[0] == (char) 0xE5)
+      if (dr[i].fcb_name[0] == (char) 0xE5)
         continue;
-      if (match_to_mask(mask, dr[i].file_name) &&
-          (!(((attr_mask == 0x08) && (!(dr[i].file_attr & 0x08))) ||
-             ((dr[i].file_attr & 0x10) && (!(attr_mask & 0x10))) ||
-             ((dr[i].file_attr & 0x08) && (!(attr_mask & 0x08))) ||
-             ((dr[i].file_attr & 0x04) && (!(attr_mask & 0x04))) ||
-             ((dr[i].file_attr & 0x02) && (!(attr_mask & 0x02)))))) {
+      if (match_to_mask(mask, dr[i].fcb_name) &&
+          (!(((attr_mask == 0x08) && (!(dr[i].attr & 0x08))) ||
+             ((dr[i].attr & 0x10) && (!(attr_mask & 0x10))) ||
+             ((dr[i].attr & 0x08) && (!(attr_mask & 0x08))) ||
+             ((dr[i].attr & 0x04) && (!(attr_mask & 0x04))) ||
+             ((dr[i].attr & 0x02) && (!(attr_mask & 0x02)))))) {
         *dir_sector_ptr = abs_sector;
         *dir_entryno_ptr = i;
         if (filename)
-          _fmemcpy(filename, dr[i].file_name, 11);
+          _fmemcpy(filename, dr[i].fcb_name, DOS_FCBNAME_LEN);
         if (attr_ptr)
-          *attr_ptr = dr[i].file_attr;
+          *attr_ptr = dr[i].attr;
         if (file_time_ptr)
-          *file_time_ptr = dr[i].file_time;
+          *file_time_ptr = dr[i].datetime;
         if (file_size_ptr)
-          *file_size_ptr = dr[i].file_size;
+          *file_size_ptr = dr[i].size;
         if (start_sec_ptr)
           *start_sec_ptr = dr[i].start_sector;
         return TRUE;
@@ -267,11 +267,11 @@ int find_next_entry(char far *mask, uchar attr_mask, char far *filename,
    for the sector if no entries are available in the current
    allocation for the directory */
 
-int create_dir_entry(uint far *dir_sector_ptr, uchar far *dir_entryno_ptr,
-                     char far *filename, uchar file_attr, uint start_sector, long file_size,
-                     ulong file_time)
+int create_dir_entry(uint16_t far *dir_sector_ptr, uint8_t far *dir_entryno_ptr,
+                     char far *filename, uint8_t attr, uint16_t start_sector, uint32_t file_size,
+                     uint32_t file_time)
 {
-  uint next_sector, dir_sector = *dir_sector_ptr;
+  uint16_t next_sector, dir_sector = *dir_sector_ptr;
   DIRREC *dr = (DIRREC *) sector_buffer;
   int i;
 
@@ -282,16 +282,16 @@ int create_dir_entry(uint far *dir_sector_ptr, uchar far *dir_entryno_ptr,
       else
         last_sector = dir_sector;
     for (i = 0; i < DIRREC_PER_SECTOR; i++) {
-      if (dr[i].file_name[0] && (dr[i].file_name[0] != (char) 0xE5))
+      if (dr[i].fcb_name[0] && (dr[i].fcb_name[0] != (char) 0xE5))
         continue;
-      _fmemcpy(dr[i].file_name, filename, 11);
-      dr[i].file_attr = file_attr;
-      dr[i].file_time = file_time;
-      dr[i].file_size = file_size;
+      _fmemcpy(dr[i].fcb_name, filename, DOS_FCBNAME_LEN);
+      dr[i].attr = attr;
+      dr[i].datetime = file_time;
+      dr[i].size = file_size;
       dr[i].start_sector = start_sector;
       *dir_sector_ptr = dir_sector;
       if (dir_entryno_ptr)
-        *dir_entryno_ptr = (uchar) i;
+        *dir_entryno_ptr = (uint8_t) i;
       return put_sector(dir_sector, sector_buffer);
     }
     if ((next_sector = next_FAT_sector(dir_sector)) == 0xFFFF) {
@@ -306,13 +306,13 @@ int create_dir_entry(uint far *dir_sector_ptr, uchar far *dir_entryno_ptr,
 
 /* Copy the appropriate piece of data from XMS into the user buffer */
 
-void read_data(long far *file_pos_ptr, uint *len_ptr, uchar far *buf,
-               uint start_sector, uint far *last_rel_ptr, uint far *last_abs_ptr)
+void read_data(uint32_t far *file_pos_ptr, uint16_t *len_ptr, uint8_t far *buf,
+               uint16_t start_sector, uint16_t far *last_rel_ptr, uint16_t far *last_abs_ptr)
 {
-  uint start, rel_sector, abs_sector;
-  uint i, count, len = *len_ptr;
+  uint16_t start, rel_sector, abs_sector;
+  uint16_t i, count, len = *len_ptr;
 
-  start = (uint) (*file_pos_ptr / SECTOR_SIZE);
+  start = (uint16_t) (*file_pos_ptr / SECTOR_SIZE);
 
   if (start < *last_rel_ptr) {
     rel_sector = 0;
@@ -327,7 +327,7 @@ void read_data(long far *file_pos_ptr, uint *len_ptr, uchar far *buf,
   }
 
   while (len) {
-    start = (uint) (*file_pos_ptr / SECTOR_SIZE);
+    start = (uint16_t) (*file_pos_ptr / SECTOR_SIZE);
     if (start > rel_sector) {
       if ((abs_sector = next_FAT_sector(abs_sector)) == 0xFFFF) {
         *len_ptr -= len;
@@ -337,14 +337,14 @@ void read_data(long far *file_pos_ptr, uint *len_ptr, uchar far *buf,
       continue;
     }
     i = (int) (*file_pos_ptr % SECTOR_SIZE);
-    count = min((uint) SECTOR_SIZE - i, len);
+    count = min((uint16_t) SECTOR_SIZE - i, len);
     if (count < SECTOR_SIZE) {
       if (!get_sector(abs_sector, sector_buffer)) {
         *len_ptr -= len;
         goto update_sectors;
       }
       last_sector = abs_sector;
-      _fmemcpy(buf, (uchar far *) &sector_buffer[i], count);
+      _fmemcpy(buf, (uint8_t far *) &sector_buffer[i], count);
     }
     else {
       if (!get_sector(abs_sector, buf)) {
@@ -365,12 +365,12 @@ update_sectors:
 /* Adjust the file size, freeing up space, or allocating more
         space, if necessary */
 
-void chop_file(long file_pos, uint far *start_sec_ptr, uint far *last_rel_ptr,
-               uint far *last_abs_ptr)
+void chop_file(uint32_t file_pos, uint16_t far *start_sec_ptr, uint16_t far *last_rel_ptr,
+               uint16_t far *last_abs_ptr)
 {
-  uint keep_sector, rel_sector, abs_sector, prev_sector = 0xFFFF;
+  uint16_t keep_sector, rel_sector, abs_sector, prev_sector = 0xFFFF;
 
-  keep_sector = (uint) ((file_pos + SECTOR_SIZE - 1) / SECTOR_SIZE);
+  keep_sector = (uint16_t) ((file_pos + SECTOR_SIZE - 1) / SECTOR_SIZE);
   abs_sector = *start_sec_ptr;
 
   for (rel_sector = 0; rel_sector < keep_sector; rel_sector++) {
@@ -401,13 +401,13 @@ void chop_file(long file_pos, uint far *start_sec_ptr, uint far *last_rel_ptr,
 /* Copy data from the user buffer into the appropriate location
         in XMS */
 
-void write_data(long far *file_pos_ptr, uint *len_ptr, uchar far *buf,
-                uint far *start_sec_ptr, uint far *last_rel_ptr, uint far *last_abs_ptr)
+void write_data(uint32_t far *file_pos_ptr, uint16_t *len_ptr, uint8_t far *buf,
+                uint16_t far *start_sec_ptr, uint16_t far *last_rel_ptr, uint16_t far *last_abs_ptr)
 {
-  uint next_sector, start, rel_sector, abs_sector;
-  uint i, count, len = *len_ptr;
+  uint16_t next_sector, start, rel_sector, abs_sector;
+  uint16_t i, count, len = *len_ptr;
 
-  start = (uint) (*file_pos_ptr / SECTOR_SIZE);
+  start = (uint16_t) (*file_pos_ptr / SECTOR_SIZE);
 
   if (start < *last_rel_ptr) {
     rel_sector = 0;
@@ -426,7 +426,7 @@ void write_data(long far *file_pos_ptr, uint *len_ptr, uchar far *buf,
   }
 
   while (len) {
-    start = (uint) (*file_pos_ptr / SECTOR_SIZE);
+    start = (uint16_t) (*file_pos_ptr / SECTOR_SIZE);
     if (start > rel_sector) {
       if ((next_sector = next_FAT_sector(abs_sector)) == 0xFFFF) {
         if (!(next_sector = next_free_sector())) {
@@ -440,13 +440,13 @@ void write_data(long far *file_pos_ptr, uint *len_ptr, uchar far *buf,
       rel_sector++;
       continue;
     }
-    i = (uint) (*file_pos_ptr % SECTOR_SIZE);
-    count = min((uint) SECTOR_SIZE - i, len);
+    i = (uint16_t) (*file_pos_ptr % SECTOR_SIZE);
+    count = min((uint16_t) SECTOR_SIZE - i, len);
     if (count < SECTOR_SIZE) {
       if (!get_sector(abs_sector, sector_buffer))
         goto update_sectors;
       last_sector = abs_sector;
-      _fmemcpy((uchar far *) &sector_buffer[i], buf, count);
+      _fmemcpy((uint8_t far *) &sector_buffer[i], buf, count);
       if (!put_sector(abs_sector, sector_buffer))
         goto update_sectors;
     }
