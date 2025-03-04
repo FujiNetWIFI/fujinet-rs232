@@ -8,7 +8,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#define DEBUG
+#undef DEBUG
 #define DEBUG_DISPATCH
 #if defined(DEBUG)
 #include "print.h"
@@ -336,11 +336,13 @@ void fnext(void)
   }
 
   fcbitize(dirrec_ptr1->fcb_name, ent->name);
-  dirrec_ptr1->attr = ent->isdir ? 0x10/*ATTR_DIRECTORY*/ : 0;
+  dirrec_ptr1->attr = ent->isdir ? ATTR_DIRECTORY : 0;
+#if 0
   dos_date = (ent->mtime.tm_mday)
     | ((ent->mtime.tm_mon + 1) << 5) | ((ent->mtime.tm_year - 80) << 9);
   dos_time = (ent->mtime.tm_sec / 2)
     | (ent->mtime.tm_min << 5) | (ent->mtime.tm_hour << 11);
+#endif
   dirrec_ptr1->time = dos_time;
   dirrec_ptr1->date = dos_date;
   dirrec_ptr1->size = ent->size;
@@ -379,38 +381,23 @@ void ffirst(void)
   char far *path;
   int success;
 
-  consolef("FFIRST 0x%02x\n", *srch_attr_ptr);
-#if 0
-  /* Special case for volume-label-only search - must be in root */
-  if (path = (*srch_attr_ptr == 0x08)
-      ? filename_ptr : _fstrrchr(filename_ptr, '\\'))
-    *path = 0;
-  consolef("SRCH ATTR PTR 0x%02x\n", *srch_attr_ptr);
-  success = get_dir_start_sector(filename_ptr, &srchrec_ptr->dir_sector);
-  if (path)
-    *path = '\\';
-  if (!success) {
-    fail(DOSERR_PATH_NOT_FOUND);
-    return;
-  }
-#else
-  if ((*srch_attr_ptr) & 0x08/*ATTR_VOLUME_LABEL*/) {
+
+  //consolef("FFIRST 0x%02x\n", *srch_attr_ptr);
+  if ((*srch_attr_ptr) == ATTR_VOLUME_LABEL) {
     //consolef("VOLUME\n");
     srchrec_ptr1->drive_num = (fn_drive_num + 1) | 0x80;
     _fmemmove(srchrec_ptr1->pattern, fcbname_ptr1, sizeof(srchrec_ptr1->pattern));
     srchrec_ptr1->attr_mask = *srch_attr_ptr;
     _fstrcpy(dirrec_ptr1->fcb_name, "FUJINET1234");
-    dirrec_ptr1->attr = 0x08/*ATTR_VOLUME_LABEL*/;
+    dirrec_ptr1->attr = ATTR_VOLUME_LABEL;
     dirrec_ptr1->datetime = 0L;
     dirrec_ptr1->size = 0L;
 
     //dumpHex(search, sizeof(*search), 0);
     //dumpHex(dirrec_ptr, sizeof(*dirrec_ptr), 0);
     succeed();
-    consolef("FOUND VOLUME\n");
     return;
   }
-#endif
 
   _fmemcpy(&srchrec_ptr1->pattern, fcbname_ptr1, 11);
 
@@ -623,7 +610,7 @@ void readfil(void)
     return;
   }
 
-  consolef("REQUESTING %i from %i\n", r.cx, p->fnfile_handle);
+  //consolef("REQUESTING %i from %i\n", r.cx, p->fnfile_handle);
   r.cx = fujifs_read(p->fnfile_handle, ((SDA_PTR_V3) sda_ptr)->current_dta, r.cx);
   p->pos += r.cx;
 #if 0 && defined(DEBUG)
@@ -934,6 +921,7 @@ void fill_sft(SFTREC_PTR p, int use_found_1, int truncate)
   }
 }
 
+#if 0
 /* Open Existing File - subfunction 16h */
 void opnfil(void)
 {
@@ -955,6 +943,7 @@ void opnfil(void)
     init_sft(p);
   }
 }
+#endif
 
 /* Truncate/Create File - subfunction 17h */
 void creatfil(void)
@@ -1054,9 +1043,7 @@ void open_extended(void)
   ffirst();
 
   path = undosify_path(filename_ptr1);
-  consolef("UNDOSIFY \"%s\"\n", path);
   path = path_with_volume(path);
-  consolef("opening file \"%s\"\n", path);
   err = fujifs_open(0, &handle, path, FUJIFS_READ);
   if (err == NETWORK_ERROR_FILE_NOT_FOUND) {
     fail(DOSERR_FILE_NOT_FOUND);
@@ -1071,6 +1058,7 @@ void open_extended(void)
 
   fill_sft(sft, (!r.ax), action & REPLACE_IF_EXISTS);
   init_sft(sft);
+  //dumpHex(sft, sizeof(*sft), 0);
   succeed();
 }
 
@@ -1105,7 +1093,7 @@ PROC dispatch_table[] = {
   delfil,               /* 0x13h */
   unsupported,          /* 0x14h */
   unsupported,          /* 0x15h */
-  opnfil,               /* 0x16h */
+  open_extended,               /* 0x16h */
   creatfil,             /* 0x17h */
   unsupported,          /* 0x18h */
   unsupported,          /* 0x19h */

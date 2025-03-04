@@ -413,7 +413,6 @@ void tsr(void)
   _asm mov highest_seg, ds;
 
   tsr_paras = highest_seg + (((uint16_t) &end) / 16) + 1 - _psp;
-  consolef("PARAS: %i\n", tsr_paras);
 
   // Plug ourselves into the Int 2Fh chain
   _dos_setvect(0x2f, redirector);

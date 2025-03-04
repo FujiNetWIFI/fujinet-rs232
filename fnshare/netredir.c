@@ -87,7 +87,7 @@ int contains_wildcards(char far *path)
   int idx;
 
 
-  for (idx = 0; idx < DOS_FILENAME_LEN; idx++)
+  for (idx = 0; idx < DOS_FCBNAME_LEN; idx++)
     if (path[idx] == '?')
       return 1;
   return 0;
@@ -123,7 +123,7 @@ int filename_match(char far *pattern, char far *filename)
   jdx = idx;
 
   // Compare the extension
-  for (idx = 8; idx < DOS_FILENAME_LEN; idx++, jdx++) {
+  for (idx = 8; idx < DOS_FCBNAME_LEN; idx++, jdx++) {
     if (pattern[idx] == ' ')
       break; // End of extension in pattern
 
@@ -205,7 +205,7 @@ int findnext(SRCHREC_PTR search)
   search->attr_mask = search_attr;
 #endif
 
-  _fmemset(dos_entry->name, ' ', sizeof(search->pattern));
+  _fmemset(dos_entry->fcb_name, ' ', sizeof(search->pattern));
   dot = strchr(ent->name, '.');
   if (dot)
     ext = dot + 1;
@@ -214,10 +214,10 @@ int findnext(SRCHREC_PTR search)
     ext = NULL;
   }
   len = dot - ent->name;
-  _fmemcpy(dos_entry->name, ent->name, len <= 8 ? len : 8);
+  _fmemcpy(dos_entry->fcb_name, ent->name, len <= 8 ? len : 8);
   if (ext) {
     len = strlen(ext);
-    _fmemcpy(&dos_entry->name[8], ext, len <= 3 ? len : 3);
+    _fmemcpy(&dos_entry->fcb_name[8], ext, len <= 3 ? len : 3);
   }
 
   dos_entry->attr = ent->isdir ? ATTR_DIRECTORY : 0;
@@ -243,7 +243,7 @@ int findfirst(SRCHREC_PTR search)
 
   // FIXME - make these arguments instead of accessing globals
   dos_entry = DOS_SDA_POINTER(dirrec);
-  pattern = DOS_SDA_VALUE(fcb_name);
+  pattern = DOS_SDA_VALUE(fcb_name1);
   search_attr = DOS_SDA_VALUE(srch_attr);
 
   consolef("FF PATTERN: 0x%02x %ls\n", search_attr, pattern);
@@ -251,10 +251,10 @@ int findfirst(SRCHREC_PTR search)
   _fmemmove(search->pattern, pattern, sizeof(search->pattern));
   search->attr_mask = search_attr;
 
-  if (search_attr & ATTR_VOLUME_LABEL) {
+  if (search_attr == ATTR_VOLUME_LABEL) {
     //consolef("VOLUME\n");
     search->drive_num = (fn_drive_num + 1) | 0x80;
-    _fstrcpy(dos_entry->name, "FUJINET1234");
+    _fstrcpy(dos_entry->fcb_name, "FUJINET1234");
     dos_entry->attr = ATTR_VOLUME_LABEL;
     dos_entry->time = dos_entry->date = 0;
     dos_entry->size = 0;
@@ -298,7 +298,7 @@ int findfirst(SRCHREC_PTR search)
     _fmemmove(search->pattern, pattern, sizeof(search->pattern));
     search->attr_mask = search_attr;
     search->sequence = 0;
-    _fstrcpy(dos_entry->name, "FUJINET1234");
+    _fstrcpy(dos_entry->fcb_name, "FUJINET1234");
     dos_entry->attr = ATTR_VOLUME_LABEL;
     dos_entry->time = 0;
     dos_entry->date = 0;
@@ -375,17 +375,17 @@ int open_extended(SFTREC_PTR sft)
 
     //consolef("FCB/PATTERN %ls\n", DOS_SDA_VALUE(fcb_name));
 
-    _fmemcpy(sft->file_name, DOS_SDA_VALUE(fcb_name), DOS_FILENAME_LEN);
+    _fmemcpy(sft->fcb_name, DOS_SDA_VALUE(fcb_name1), DOS_FCBNAME_LEN);
     *DOS_SDA_POINTER(srch_attr) = 0x3f;
     findfirst(DOS_SDA_POINTER(srchrec));
     dos_entry = DOS_SDA_POINTER(dirrec);
 
-    sft->file_pos = 0;
+    sft->pos = 0;
 
-    sft->file_attr = dos_entry->attr;
-    sft->file_time = dos_entry->time;
-    sft->file_date = dos_entry->date;
-    sft->file_size = dos_entry->size;
+    sft->attr = dos_entry->attr;
+    sft->time = dos_entry->time;
+    sft->date = dos_entry->date;
+    sft->size = dos_entry->size;
 
     sft->open_mode = mode;
     // FIXME - use constants
@@ -403,7 +403,7 @@ int open_extended(SFTREC_PTR sft)
     sft->rel_sector = sft->abs_sector = 0xffff;
     sft->dev_drvr_ptr = 0;
     sft->dir_sector = 0;
-    sft->dir_entry_no = -1;
+    sft->sequence = -1;
   }
 
   path = undosify_path(path);
@@ -440,8 +440,8 @@ int read_file(SFTREC_PTR sft, uint16_t far *len_ptr)
   *len_ptr = rlen;
 
   // These fields appear to only be for our own use, DOS doesn't look at them
-  sft->file_pos += rlen;
-  sft->rel_sector = (sft->file_pos + 511) / 512;
+  sft->pos += rlen;
+  sft->rel_sector = (sft->pos + 511) / 512;
   sft->abs_sector = sft->rel_sector;
 
   return DOSERR_NONE;

@@ -84,7 +84,6 @@ fujifs_handle fujifs_find_handle()
 
 
   if (!fujifs_did_init) {
-    consolef("FUJIFS INIT\n");
     memset(fujifs_open_handles, 0xff, sizeof(fujifs_open_handles));
     fujifs_did_init = 1;
     for (idx = 0; idx < NETDEV_TOTAL; idx++)
@@ -164,16 +163,12 @@ errcode fujifs_open(fujifs_handle host_handle, fujifs_handle far *file_handle,
     // Get prefix of parent
     reply = fujiF5_read(NETDEV(host_handle), CMD_GETCWD, 0, 0, fujifs_buf, OPEN_SIZE);
     if (reply != REPLY_COMPLETE) {
-      consolef("FUJIFS UNABLE TO GETCWD: %i\n", reply);
       return NETWORK_ERROR_SERVICE_NOT_AVAILABLE;
     }
     for (idx = 0; idx < sizeof(fujifs_buf) - 1 && fujifs_buf[idx]
            && fujifs_buf[idx] != ATARI_STRING_TERM; idx++)
       ;
     fujifs_buf[idx] = 0;
-    consolef("FUJIFS GETCWD %i/%i:%i \"%s\"\n",
-             *file_handle, host_handle, FN_HANDLE(*file_handle).parent,
-             fujifs_buf);
     // FIXME - check err
 
     // Set prefix of new handle
@@ -184,9 +179,6 @@ errcode fujifs_open(fujifs_handle host_handle, fujifs_handle far *file_handle,
   }
 
   ennify(*file_handle, path);
-  consolef("FUJIFS OPENING %i/%i:%i \"%ls\" \"%s\"\n",
-           *file_handle, host_handle, FN_HANDLE(*file_handle).parent,
-           path, fujifs_buf);
   reply = fujiF5_write(NETDEV(*file_handle), CMD_OPEN, mode, 0, fujifs_buf, OPEN_SIZE);
 #if 0
   if (reply != REPLY_COMPLETE)
@@ -234,7 +226,6 @@ errcode fujifs_close(fujifs_handle handle)
   if (handle < 1 || handle > NETDEV_TOTAL || !FN_HANDLE(handle).is_open)
     return NETWORK_ERROR_NOT_CONNECTED;
 
-  consolef("FUJIFS CLOSING %i\n", handle);
   fujiF5_none(NETDEV(handle), CMD_CLOSE, 0, 0, NULL, 0);
   FN_HANDLE(handle).is_open = 0;
   return 0;
@@ -318,7 +309,6 @@ errcode fujifs_opendir(fujifs_handle host_handle, fujifs_handle far *dir_handle,
     strcat(fujifs_buf, "/.");
   }
 
-  consolef("FUJIFS DIR OPEN: %i \"%s\"\n", host_handle, fujifs_buf);
   FN_HANDLE(temp).position = FN_HANDLE(temp).length = 0;
   // FIXME - check if open failed and return NETWORK_ERROR_NOT_A_DIRECTORY
   return fujifs_open(host_handle, dir_handle, fujifs_buf, FUJIFS_DIRECTORY);
@@ -467,7 +457,6 @@ errcode fujifs_chdir(fujifs_handle host_handle, const char far *path)
 
 
   ennify(host_handle, path);
-  consolef("FUJIFS CHDIR %i \"%ls\" \"%s\"\n", host_handle, path, fujifs_buf);
   reply = fujiF5_write(NETDEV(host_handle), CMD_CHDIR, 0, 0, fujifs_buf, OPEN_SIZE);
 #if 0
   if (reply != REPLY_COMPLETE)
