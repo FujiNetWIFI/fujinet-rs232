@@ -1,5 +1,7 @@
 #include "redir.h"
+#ifdef ENABLE_XMS
 #include "ramdrive.h"
+#endif
 #include "dosfunc.h"
 #include "fujifs.h"
 #include "doserr.h"
@@ -351,6 +353,7 @@ void fnext(void)
   return;
 }
 
+#ifdef ENABLE_XMS
 /* Internal findnext for delete and rename processing */
 uint16_t fnext2(void)
 {
@@ -359,6 +362,7 @@ uint16_t fnext2(void)
                           NULL, NULL, NULL, &srchrec_ptr2->fndir_handle,
                           &srchrec_ptr2->sequence)) ? 0 : 18;
 }
+#endif
 
 /* FindFirst - subfunction 1Bh */
 
@@ -417,6 +421,7 @@ void ffirst(void)
     r.ax = 2;   // make fnext error code suitable to ffirst
 }
 
+#ifdef ENABLE_XMS
 /* Internal findfirst for delete and rename processing */
 uint16_t ffirst2(void)
 {
@@ -428,7 +433,9 @@ uint16_t ffirst2(void)
 
   return fnext2();
 }
+#endif
 
+#ifdef ENABLE_XMS
 /* ReMove Directory - subfunction 01h */
 void rd(void)
 {
@@ -482,7 +489,9 @@ void rd(void)
   FREE_SECTOR_CHAIN(dirrec_ptr1->start_sector);
   succeed();
 }
+#endif
 
+#ifdef ENABLE_XMS
 /* Make Directory - subfunction 03h */
 void md(void)
 {
@@ -532,6 +541,7 @@ void md(void)
   }
   succeed();
 }
+#endif
 
 /* Change Directory - subfunction 05h */
 void cd(void)
@@ -563,30 +573,7 @@ void clsfil(void)
   if (p->handle_count)  /* If handle count not 0, decrement it */
     --p->handle_count;
 
-#if 0
-  /* If writing, create/update dir entry for file */
-  if (!(p->open_mode & 3))
-    return;
-
-  if (p->sequence == 0xff) {
-    if (!create_dir_entry(&p->fndir_handle, &p->sequence, p->name,
-                          p->attr, p->start_sector, p->file_size, p->file_time))
-      fail(DOSERR_ACCESS_DENIED);
-  }
-  else {
-    if ((last_sector != p->fndir_handle) && (!get_sector(p->fndir_handle, sector_buffer)))
-      fail(DOSERR_ACCESS_DENIED);
-    last_sector = p->fndir_handle;
-    ((DIRREC_PTR) sector_buffer)[p->sequence].attr = p->attr;
-    ((DIRREC_PTR) sector_buffer)[p->sequence].start_sector = p->start_sector;
-    ((DIRREC_PTR) sector_buffer)[p->sequence].file_size = p->file_size;
-    ((DIRREC_PTR) sector_buffer)[p->sequence].file_time = p->file_time;
-    if (!put_sector(p->fndir_handle, sector_buffer))
-      fail(DOSERR_ACCESS_DENIED);
-  }
-#else
   fujifs_close(p->fnfile_handle);
-#endif  
 }
 
 /* Commit File - subfunction 07h */
@@ -619,6 +606,7 @@ void readfil(void)
 #endif
 }
 
+#ifdef ENABLE_XMS
 /* Write to File - subfunction 09h */
 void writfil(void)
 {
@@ -644,6 +632,7 @@ void writfil(void)
   if (p->pos > p->size)
     p->size = p->pos;
 }
+#endif
 
 /* Lock file - subfunction 0Ah */
 
@@ -701,6 +690,7 @@ void unlockfil(void)
   return;
 }
 
+#ifdef ENABLE_XMS
 /* Get Disk Space - subfunction 0Ch */
 void dskspc(void)
 {
@@ -709,6 +699,7 @@ void dskspc(void)
   r.cx = SECTOR_SIZE;
   r.dx = free_sectors;
 }
+#endif
 
 /* Get File Attributes - subfunction 0Fh */
 void getfatt(void)
@@ -726,6 +717,8 @@ void getfatt(void)
   r.ax = (uint16_t) dirrec_ptr1->attr;
 }
 
+
+#ifdef ENABLE_XMS
 /* Set File Attributes - subfunction 0Eh */
 void setfatt()
 {
@@ -745,7 +738,9 @@ void setfatt()
     return;
   }
 }
+#endif
 
+#ifdef ENABLE_XMS
 /* Rename File - subfunction 11h */
 void renfil(void)
 {
@@ -825,7 +820,9 @@ void renfil(void)
   else
     fail(r.ax);
 }
+#endif
 
+#ifdef ENABLE_XMS
 /* Delete File - subfunction 13h */
 void delfil(void)
 {
@@ -857,6 +854,7 @@ void delfil(void)
   else
     fail(r.ax);
 }
+#endif
 
 /* Support functions for the various file open functions below */
 
@@ -899,7 +897,9 @@ void fill_sft(SFTREC_PTR p, int use_found_1, int truncate)
     p->attr = dirrec_ptr1->attr;
     p->datetime = truncate ? dos_ftime() : dirrec_ptr1->datetime;
     if (truncate) {
+#ifdef ENABLE_XMS
       FREE_SECTOR_CHAIN(dirrec_ptr1->start_sector);
+#endif
       p->fnfile_handle = 0xFFFF;
     }
 #if 0
@@ -1070,25 +1070,25 @@ typedef void (*PROC)(void);
 
 PROC dispatch_table[] = {
   inquiry,              /* 0x00h */
-  rd,                   /* 0x01h */
+  unsupported,                   /* 0x01h */
   unsupported,          /* 0x02h */
-  md,                   /* 0x03h */
+  unsupported,                   /* 0x03h */
   unsupported,          /* 0x04h */
   cd,                   /* 0x05h */
   clsfil,               /* 0x06h */
   cmmtfil,              /* 0x07h */
   readfil,              /* 0x08h */
-  writfil,              /* 0x09h */
+  unsupported,              /* 0x09h */
   lockfil,              /* 0x0Ah */
   unlockfil,            /* 0x0Bh */
-  dskspc,               /* 0x0Ch */
+  unsupported,               /* 0x0Ch */
   unsupported,          /* 0x0Dh */
-  setfatt,              /* 0x0Eh */
+  unsupported,              /* 0x0Eh */
   getfatt,              /* 0x0Fh */
   unsupported,          /* 0x10h */
-  renfil,               /* 0x11h */
+  unsupported,               /* 0x11h */
   unsupported,          /* 0x12h */
-  delfil,               /* 0x13h */
+  unsupported,               /* 0x13h */
   unsupported,          /* 0x14h */
   unsupported,          /* 0x15h */
   open_extended,               /* 0x16h */

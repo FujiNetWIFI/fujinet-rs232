@@ -37,6 +37,7 @@ struct {
 typedef struct {
   uint8_t parent;
   uint8_t is_open:1;
+  uint8_t needs_auth:1;
   size_t position, length;
 } fn_network_handle;
 
@@ -84,10 +85,8 @@ fujifs_handle fujifs_find_handle()
 
 
   if (!fujifs_did_init) {
-    memset(fujifs_open_handles, 0xff, sizeof(fujifs_open_handles));
+    memset(fujifs_open_handles, 0, sizeof(fujifs_open_handles));
     fujifs_did_init = 1;
-    for (idx = 0; idx < NETDEV_TOTAL; idx++)
-      FN_HANDLE(idx + 1).is_open = 0;
   }
 
   for (idx = 0; idx < NETDEV_TOTAL; idx++) {
@@ -115,7 +114,9 @@ errcode fujifs_open_url(fujifs_handle far *host_handle, const char *url,
   // User/pass is "sticky" and needs to be set/reset on open
   memset(fujifs_buf, 0, sizeof(fujifs_buf));
 
-  // FIXME - will CMD_USERNAME or CMD_PASSWORD close or alter open stream?
+  // FIXME - if user/password has been passed then mark all potential
+  //         handles as needing auth
+
   if (user)
     strcpy(fujifs_buf, user);
   reply = fujiF5_write(NETDEV(temp), CMD_USERNAME, 0, 0, fujifs_buf, OPEN_SIZE);

@@ -10,7 +10,7 @@ LDFLAGS = &
 	DEBUG ALL &
 	LIBPATH ../fujicom
 
-CFILES  = fnshare.c bios.c dosfunc.c xms.c ramdrive.c redir.c
+CFILES  = fnshare.c bios.c dosfunc.c redir.c
 OBJS = $(CFILES:.c=.obj) $(AFILES:.asm=.obj) ../sys/print.obj ../ncopy/fujifs.obj
 
 $(TARGET): $(OBJS)

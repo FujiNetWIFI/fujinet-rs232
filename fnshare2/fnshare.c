@@ -1,28 +1,9 @@
-/*******************************************************
-
- PHANTOM.C - A network-redirector based XMS Ram Disk
- Copyright (c) David Maxey 1993.  All rights reserved.
- From "Undocumented DOS", 2nd edition (Addison-Wesley, 1993)
-
- Much of this code is explained in depth in Undocumented
- DOS, 2nd edition, chapter 8, which has a 60-page description
- of the network redirector, and an in-depth examination of
- how Phantom handles file read, open, ffirst, cd, and md.
- UndocDOS also contains a full specification for the redirector
- interface.
-
- 1993-Jul-25 - Drive number should be one less. AES found using
-               FILES/USEFCB. Porbably same as Markun/LanMan
-               problem. Search for ref: DR_TOO_HIGH
-
- 2025-Feb-26 - Converted to compile with Open Watcom - FozzTexx
-
-*******************************************************/
-
 #include "bios.h"
 #include "dosfunc.h"
+#ifdef ENABLE_XMS
 #include "xms.h"
 #include "ramdrive.h"
+#endif
 #include "redir.h"
 #include "fujifs.h"
 #include <stdio.h>	// printf
@@ -39,7 +20,7 @@
 
 #define DEBUG
 #ifdef DEBUG
-#include "../../fujinet-rs232/sys/print.h"
+#include "print.h"
 #endif
 
 /* ****************************************************
@@ -66,7 +47,9 @@ typedef struct {
   char signature[10];           /* The TSR's signature string */
   uint16_t psp;                     /* This instance's PSP */
   uint8_t drive_no;               /* A: is 1, B: is 2, etc. */
+#ifdef ENABLE_XMS
   uint16_t xms_handle;              /* This instance's disk XMS handle */
+#endif
   uint8_t far *our_handler;       /* This instance's int 2Fh handler */
   uint8_t far *prev_handler;      /* Previous int 2Fh handler in the chain */
 } SIGREC, far *SIGREC_PTR;
@@ -80,8 +63,10 @@ LOLREC_PTR lolptr;              /* pointer to List Of Lists */
 /* Fail Phantom, print message, exit to DOS */
 void failprog(char *msg)
 {
+#ifdef ENABLE_XMS
   if (xms_handle)
     xms_free_block(xms_handle);
+#endif
   print_string((uint8_t far *) msg, TRUE);
   exit(1);
 }
@@ -301,9 +286,11 @@ void unload_latest()
   psp = ((SIGREC_PTR) p_vect)->psp;
   fn_drive_num = ((SIGREC_PTR) p_vect)->drive_no;
 
+#ifdef ENABLE_XMS
   // Free up the XMS memory
   if ((!xms_is_present()) || (!xms_free_block(((SIGREC_PTR) p_vect)->xms_handle)))
     print_string("Could not free XMS memory", TRUE);
+#endif
 
   cds_ptr = lolptr->cds_ptr;
   if (_osmajor == 3)
@@ -397,7 +384,9 @@ void prepare_for_tsr(void)
 
   _dos_setvect(i, (INTVECT) (buf = MK_FP(_psp, 0x80)));
 
+#ifdef ENABLE_XMS
   sigrec.xms_handle = xms_handle;
+#endif
   sigrec.psp = _psp;
   sigrec.drive_no = fn_drive_num;
   sigrec.our_handler = (void far *) redirector;
@@ -454,12 +443,16 @@ void get_password(char *password, size_t max_len)
   return;
 }
 
+char auth_buf[256];
+
 int _cdecl main(uint16_t argc, char **argv)
 {
   uint8_t drive_letter;
   const char *url;
   errcode err;
-  
+
+
+  printf("FNSHARE version %s\n", VERSION);
 
   if (argc < 2) {
     printf("Usage: %s <command>\n", argv[0]);
@@ -480,14 +473,14 @@ int _cdecl main(uint16_t argc, char **argv)
   if (err) {
     // Maybe authentication is needed?
     printf("User: ");
-    fgets(sector_buffer, 128, stdin);
-    if (sector_buffer[0])
-      sector_buffer[strlen(sector_buffer) - 1] = 0;
+    fgets(auth_buf, 128, stdin);
+    if (auth_buf[0])
+      auth_buf[strlen(auth_buf) - 1] = 0;
     printf("Password: ");
     fflush(stdout);
-    get_password(&sector_buffer[128], 128);
+    get_password(&auth_buf[128], 128);
 
-    err = fujifs_open_url(&fn_host, url, sector_buffer, &sector_buffer[128]);
+    err = fujifs_open_url(&fn_host, url, auth_buf, &auth_buf[128]);
     if (err) {
       printf("Err: %i unable to open URL: %s\n", err, url);
       exit(1);
@@ -503,8 +496,10 @@ int _cdecl main(uint16_t argc, char **argv)
     fn_volume[end - 1] = 0;
   fn_cwd[0] = 0;
 
+#ifdef ENABLE_XMS
   // Initialize XMS and alloc the 'disk space'
   set_up_xms_disk();
+#endif
   is_ok_to_load();
   get_dos_vars();
   set_up_cds();
