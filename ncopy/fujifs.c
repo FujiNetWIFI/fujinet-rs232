@@ -37,8 +37,9 @@ struct {
 typedef struct {
   uint8_t parent;
   uint8_t is_open:1;
-  uint8_t needs_auth:1;
+  uint8_t did_auth:1;
   size_t position, length;
+  char user[32], password[32];
 } fn_network_handle;
 
 static fn_network_handle fujifs_open_handles[NETDEV_TOTAL];
@@ -105,31 +106,28 @@ errcode fujifs_open_url(fujifs_handle far *host_handle, const char *url,
   int reply;
   fujifs_handle temp;
   errcode err;
+  fn_network_handle *hhp;
 
 
   temp = fujifs_find_handle();
   if (!temp)
     return NETWORK_ERROR_NO_DEVICE_AVAILABLE;
 
-  // User/pass is "sticky" and needs to be set/reset on open
-  memset(fujifs_buf, 0, sizeof(fujifs_buf));
-
-  // FIXME - if user/password has been passed then mark all potential
-  //         handles as needing auth
-
+  hhp = &FN_HANDLE(temp);
   if (user)
-    strcpy(fujifs_buf, user);
-  reply = fujiF5_write(NETDEV(temp), CMD_USERNAME, 0, 0, fujifs_buf, OPEN_SIZE);
-  // FIXME - check err
-
-  memset(fujifs_buf, 0, sizeof(fujifs_buf));
+    strcpy(hhp->user, user);
   if (password)
-    strcpy(fujifs_buf, password);
-  reply = fujiF5_write(NETDEV(temp), CMD_PASSWORD, 0, 0, fujifs_buf, OPEN_SIZE);
+    strcpy(hhp->password, password);
+
+  // User/pass is "sticky" and needs to be set/reset on open
+  reply = fujiF5_write(NETDEV(temp), CMD_USERNAME, 0, 0, hhp->user, OPEN_SIZE);
+  // FIXME - check err
+  reply = fujiF5_write(NETDEV(temp), CMD_PASSWORD, 0, 0, hhp->password, OPEN_SIZE);
   // FIXME - check err
 
-  // This wasn't an open commend so no need to close, just mark it available
-  FN_HANDLE(temp).is_open = 0;
+  // This wasn't an open commend so no need to close, just mark it
+  // available, it'll get re-used on the real open
+  hhp->is_open = 0;
 
   err = fujifs_open(0, host_handle, url, FUJIFS_DIRECTORY);
   if (err)
@@ -147,36 +145,64 @@ errcode fujifs_close_url(fujifs_handle handle)
   return fujifs_close(handle);
 }
 
+static uint8_t is_fq_url(const char far *path)
+{
+  uint16_t idx;
+
+
+  for (idx = 0; path[idx] && path[idx+1] && path[idx+2]; idx++)
+    if (path[idx] == ':' && path[idx+1] == '/' && path[idx+2] == '/')
+      return 1;
+
+  return 0;
+}
+
 errcode fujifs_open(fujifs_handle host_handle, fujifs_handle far *file_handle,
                     const char far *path, uint16_t mode)
 {
   int reply;
+  fn_network_handle *fhp;
 
 
   *file_handle = fujifs_find_handle();
   if (!*file_handle)
     return NETWORK_ERROR_NO_DEVICE_AVAILABLE;
+  fhp = &FN_HANDLE(*file_handle);
 
-  if (host_handle && host_handle != FN_HANDLE(*file_handle).parent) {
-    int idx;
+  if (host_handle) {
+    fn_network_handle *hhp = &FN_HANDLE(host_handle);
 
 
-    // Get prefix of parent
-    reply = fujiF5_read(NETDEV(host_handle), CMD_GETCWD, 0, 0, fujifs_buf, OPEN_SIZE);
-    if (reply != REPLY_COMPLETE) {
-      return NETWORK_ERROR_SERVICE_NOT_AVAILABLE;
+    if (hhp->user[0] && (!fhp->did_auth || host_handle != fhp->parent)) {
+      reply = fujiF5_write(NETDEV(*file_handle), CMD_USERNAME, 0, 0, hhp->user, OPEN_SIZE);
+      // FIXME - check err
+      reply = fujiF5_write(NETDEV(*file_handle), CMD_PASSWORD, 0, 0, hhp->password, OPEN_SIZE);
+      // FIXME - check err
+      fhp->did_auth = 1;
     }
-    for (idx = 0; idx < sizeof(fujifs_buf) - 1 && fujifs_buf[idx]
-           && fujifs_buf[idx] != ATARI_STRING_TERM; idx++)
-      ;
-    fujifs_buf[idx] = 0;
-    // FIXME - check err
 
-    // Set prefix of new handle
-    reply = fujiF5_write(NETDEV(*file_handle), CMD_CHDIR, 0, 0, fujifs_buf, OPEN_SIZE);
-    // FIXME - check err
+    if (host_handle != fhp->parent && !is_fq_url(path)) {
+      int idx;
 
-    FN_HANDLE(*file_handle).parent = host_handle;
+
+      // Get prefix of parent
+      reply = fujiF5_read(NETDEV(host_handle), CMD_GETCWD, 0, 0, fujifs_buf, OPEN_SIZE);
+      if (reply != REPLY_COMPLETE) {
+        return NETWORK_ERROR_SERVICE_NOT_AVAILABLE;
+      }
+      for (idx = 0; idx < sizeof(fujifs_buf) - 1 && fujifs_buf[idx]
+             && fujifs_buf[idx] != ATARI_STRING_TERM; idx++)
+        ;
+      fujifs_buf[idx] = 0;
+      // FIXME - check err
+
+      // Set prefix of new handle
+      reply = fujiF5_write(NETDEV(*file_handle), CMD_CHDIR, 0, 0, fujifs_buf, OPEN_SIZE);
+      // FIXME - check err
+    }
+
+
+    fhp->parent = host_handle;
   }
 
   ennify(*file_handle, path);
@@ -207,7 +233,7 @@ errcode fujifs_open(fujifs_handle host_handle, fujifs_handle far *file_handle,
     status.errcode = NETWORK_SUCCESS;
 
   if (status.errcode > NETWORK_SUCCESS && !status.length) {
-    FN_HANDLE(*file_handle).is_open = 0;
+    fhp->is_open = 0;
     return status.errcode;
   }
 
@@ -218,7 +244,7 @@ errcode fujifs_open(fujifs_handle host_handle, fujifs_handle far *file_handle,
 #endif
 
  done:
-  FN_HANDLE(*file_handle).parent = host_handle;
+  fhp->parent = host_handle;
   return 0;
 }
 

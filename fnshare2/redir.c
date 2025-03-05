@@ -310,7 +310,7 @@ void fnext(void)
     errcode err;
 
 
-    err = fujifs_opendir(0, &handle, path_with_volume(""));
+    err = fujifs_opendir(fn_host, &handle, path_with_volume(""));
     if (err) {
       fail(DOSERR_UNEXPECTED_NETWORK_ERROR);
       return;
@@ -1042,7 +1042,7 @@ void open_extended(void)
 
   path = undosify_path(filename_ptr1);
   path = path_with_volume(path);
-  err = fujifs_open(0, &handle, path, FUJIFS_READ);
+  err = fujifs_open(fn_host, &handle, path, FUJIFS_READ);
   if (err == NETWORK_ERROR_FILE_NOT_FOUND) {
     fail(DOSERR_FILE_NOT_FOUND);
     return;
