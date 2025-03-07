@@ -264,7 +264,7 @@ size_t fujifs_read(fujifs_handle handle, uint8_t far *buf, size_t length)
   int reply;
 
 
-  if (handle < 1 || handle >= NETDEV_TOTAL)
+  if (handle < 1 || handle > NETDEV_TOTAL || !FN_HANDLE(handle).is_open)
     return 0;
 
   // Check how many bytes are available
@@ -498,4 +498,20 @@ errcode fujifs_chdir(fujifs_handle host_handle, const char far *path)
   FN_HANDLE(host_handle).parent = host_handle;
 
   return 0;
+}
+
+errcode fujifs_seek(fujifs_handle handle, off_t position)
+{
+  int reply;
+
+
+  if (handle < 1 || handle > NETDEV_TOTAL || !FN_HANDLE(handle).is_open)
+    return NETWORK_ERROR_NOT_CONNECTED;
+
+  reply = fujiF5_write(NETDEV(handle), CMD_SEEK,
+		       position & 0xffff, (position >> 16) & 0xffff, NULL, 0);
+  if (reply != REPLY_COMPLETE)
+    return NETWORK_ERROR_SERVICE_NOT_AVAILABLE;
+
+  return NETWORK_SUCCESS;
 }

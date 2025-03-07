@@ -43,5 +43,6 @@ extern errcode fujifs_opendir(fujifs_handle host_handle, fujifs_handle far *dir_
 extern errcode fujifs_closedir(fujifs_handle handle);
 extern FN_DIRENT *fujifs_readdir(fujifs_handle handle);
 extern errcode fujifs_chdir(fujifs_handle host_handle, const char far *path);
+extern errcode fujifs_seek(fujifs_handle handle, off_t position);
 
 #endif /* _FUJIFS_H */

@@ -175,8 +175,12 @@ typedef struct {
   };
   uint32_t size;
   uint32_t pos;
+#if 0
   uint16_t rel_sector;
   uint16_t abs_sector;
+#else
+  uint32_t last_pos;
+#endif
   uint16_t dir_sector;
   uint8_t sequence;
   char fcb_name[DOS_FCBNAME_LEN];

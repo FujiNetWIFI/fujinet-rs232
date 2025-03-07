@@ -95,18 +95,18 @@ uint8_t fxnmap[] = {
   _spopnfil     /* 0x2Eh */
 };
 
-uint8_t fn_drive_num;				/* A: is 1, B: is 2, etc. */
+uint8_t fn_drive_num;                           /* A: is 1, B: is 2, etc. */
 fujifs_handle fn_host;
 char *fn_volume;
 char fn_cwd[DOS_MAX_PATHLEN+1];
 
-ALL_REGS r;					/* Global save area for all caller's regs */
+ALL_REGS r;                                     /* Global save area for all caller's regs */
 char far *cds_path_root = "FujiNet  :\\";       /* Root string for CDS */
-uint16_t cds_root_size;				/* Size of our CDS root string */
-uint16_t far *stack_param_ptr;			/* ptr to word at top of stack on entry */
-int curr_fxn;					/* Record of function in progress */
-int filename_is_char_device;			/* generate_fcbname found character device name */
-INTVECT prev_int2f_vector;			/* For chaining, and restoring on unload */
+uint16_t cds_root_size;                         /* Size of our CDS root string */
+uint16_t far *stack_param_ptr;                  /* ptr to word at top of stack on entry */
+int curr_fxn;                                   /* Record of function in progress */
+int filename_is_char_device;                    /* generate_fcbname found character device name */
+INTVECT prev_int2f_vector;                      /* For chaining, and restoring on unload */
 
 uint16_t dos_ss;                    /* DOS's saved SS at entry */
 uint16_t dos_sp;                    /* DOS's saved SP at entry */
@@ -117,21 +117,21 @@ char our_stack[STACK_SIZE];     /* our internal stack */
 /* these are version independent pointers to various frequently used
         locations within the various DOS structures */
 DIRREC_PTR dirrec_ptr1;         /* ptr to 1st found dir entry area in SDA */
-DIRREC_PTR dirrec_ptr2;		/* ptr to 1st found dir entry area in SDA */
+DIRREC_PTR dirrec_ptr2;         /* ptr to 1st found dir entry area in SDA */
 SRCHREC_PTR srchrec_ptr1;       /* ptr to 1st Search Data Block in SDA */
-SRCHREC_PTR srchrec_ptr2;	/* ptr to 2nd Search Data Block in SDA */
+SRCHREC_PTR srchrec_ptr2;       /* ptr to 2nd Search Data Block in SDA */
 char far *current_path;         /* ptr to current path in CDS */
 char far *fcbname_ptr1;         /* ptr to 1st FCB-style name in SDA */
-char far *fcbname_ptr2;		/* ptr to 2nd FCB-style name in SDA */
+char far *fcbname_ptr2;         /* ptr to 2nd FCB-style name in SDA */
 char far *filename_ptr1;        /* ptr to 1st filename area in SDA */
-char far *filename_ptr2;	/* ptr to 2nd filename area in SDA */
+char far *filename_ptr2;        /* ptr to 2nd filename area in SDA */
 uint8_t far *sda_ptr;           /* ptr to SDA */
 uint8_t far *srch_attr_ptr;     /* ptr to search attribute in SDA */
 
 static char temp_path[DOS_MAX_PATHLEN+1];
 
 #ifdef __WATCOMC__
-#define FCARRY				INTR_CF
+#define FCARRY                          INTR_CF
 #else
 #define FCARRY                          0x0001
 #endif
@@ -296,12 +296,8 @@ char *path_with_volume(char far *path)
 void fnext(void)
 {
   FN_DIRENT *ent;
-  uint8_t search_attr;
   uint16_t dos_date, dos_time;
 
-
-  // FIXME - make these arguments instead of accessing globals
-  search_attr = srchrec_ptr1->attr_mask;
 
   //consolef("FNEXT \"%ls\"\n", srchrec_ptr->pattern);
   //consolef("DIR ENTRY NO %i\n", srchrec_ptr->dir_entry_no);
@@ -568,12 +564,12 @@ void cd(void)
 /* Close File - subfunction 06h */
 void clsfil(void)
 {
-  SFTREC_PTR p = (SFTREC_PTR) MK_FP(r.es, r.di);
+  SFTREC_PTR sft = (SFTREC_PTR) MK_FP(r.es, r.di);
 
-  if (p->handle_count)  /* If handle count not 0, decrement it */
-    --p->handle_count;
+  if (sft->handle_count)  /* If handle count not 0, decrement it */
+    --sft->handle_count;
 
-  fujifs_close(p->fnfile_handle);
+  fujifs_close(sft->fnfile_handle);
 }
 
 /* Commit File - subfunction 07h */
@@ -588,19 +584,28 @@ void cmmtfil(void)
 // see Undocumented DOS, 2nd edition, chapter 8
 void readfil(void)
 {
-  SFTREC_PTR p = (SFTREC_PTR) MK_FP(r.es, r.di);
+  SFTREC_PTR sft = (SFTREC_PTR) MK_FP(r.es, r.di);
 
-  if (p->open_mode & 1) {
+  if (sft->open_mode & 1) {
     fail(DOSERR_ACCESS_DENIED);
     return;
   }
 
-  //consolef("REQUESTING %i from %i\n", r.cx, p->fnfile_handle);
-  r.cx = fujifs_read(p->fnfile_handle, ((SDA_PTR_V3) sda_ptr)->current_dta, r.cx);
-  p->pos += r.cx;
+#ifdef DEBUG
+  consolef("REQUESTING %i from %i at %li/%li\n", r.cx, sft->fnfile_handle,
+	   sft->pos, sft->last_pos);
+#endif
+  if (sft->pos != sft->last_pos)
+    fujifs_seek(sft->fnfile_handle, sft->pos);
+  r.cx = fujifs_read(sft->fnfile_handle, ((SDA_PTR_V3) sda_ptr)->current_dta, r.cx);
+#ifdef DEBUG
+  consolef("READ %i\n", r.cx);
+#endif
+  sft->pos += r.cx;
+  sft->last_pos = sft->pos;
 #if 0 && defined(DEBUG)
   consolef("SFT: %i\n", r.cx);
-  dumpHex(p, sizeof(*p), 0);
+  dumpHex(sft, sizeof(*sft), 0);
   consolef("REGS:\n");
   dumpHex(&r, sizeof(r), 0);
 #endif
@@ -610,27 +615,27 @@ void readfil(void)
 /* Write to File - subfunction 09h */
 void writfil(void)
 {
-  SFTREC_PTR p = (SFTREC_PTR) MK_FP(r.es, r.di);
+  SFTREC_PTR sft = (SFTREC_PTR) MK_FP(r.es, r.di);
 
-  if (!(p->open_mode & 3)) {
+  if (!(sft->open_mode & 3)) {
     fail(DOSERR_ACCESS_DENIED);
     return;
   }
 
-  p->datetime = dos_ftime();
+  sft->datetime = dos_ftime();
 
   /* Take account of DOS' 0-byte-write-truncates-file counter */
   if (!r.cx) {
-    p->size = p->pos;
-    chop_file(p->pos, &p->fnfile_handle, &p->rel_sector, &p->abs_sector);
+    sft->size = sft->pos;
+    chop_file(sft->pos, &sft->fnfile_handle, &sft->rel_sector, &sft->abs_sector);
     return;
   }
 
   /* Write from the caller's buffer and update the SFT for the file */
-  write_data(&p->pos, &r.cx, ((SDA_PTR_V3) sda_ptr)->current_dta,
-             &p->fnfile_handle, &p->rel_sector, &p->abs_sector);
-  if (p->pos > p->size)
-    p->size = p->pos;
+  write_data(&sft->pos, &r.cx, ((SDA_PTR_V3) sda_ptr)->current_dta,
+             &sft->fnfile_handle, &sft->rel_sector, &sft->abs_sector);
+  if (sft->pos > sft->size)
+    sft->size = sft->pos;
 }
 #endif
 
@@ -858,7 +863,7 @@ void delfil(void)
 
 /* Support functions for the various file open functions below */
 
-void init_sft(SFTREC_PTR p)
+void init_sft(SFTREC_PTR sft)
 {
   /*
      Initialize the supplied SFT entry. Note the modifications to
@@ -866,21 +871,25 @@ void init_sft(SFTREC_PTR p)
      it, it is an FCB open, and requires the Set FCB Owner internal
      DOS function to be called.
    */
-  if (p->open_mode & 0x8000)
+  if (sft->open_mode & 0x8000)
     /* File is being opened via FCB */
-    p->open_mode |= 0x00F0;
+    sft->open_mode |= 0x00F0;
   else
-    p->open_mode &= 0x000F;
+    sft->open_mode &= 0x000F;
 
   /* Mark file as being on network drive, unwritten to */
-  p->dev_info_word = (uint16_t) (0x8040 | (uint16_t) fn_drive_num);
-  p->pos = 0;
-  p->rel_sector = 0xffff;
-  p->abs_sector = 0xffff;
-  p->dev_drvr_ptr = NULL;
+  sft->dev_info_word = (uint16_t) (0x8040 | (uint16_t) fn_drive_num);
+  sft->pos = 0;
+#if 0
+  sft->rel_sector = 0xffff;
+  sft->abs_sector = 0xffff;
+#else
+  sft->last_pos = 0;
+#endif
+  sft->dev_drvr_ptr = NULL;
 
-  if (p->open_mode & 0x8000)
-    set_sft_owner(p);
+  if (sft->open_mode & 0x8000)
+    set_sft_owner(sft);
 }
 
 /* Note that the following function uses dirrec_ptr to supply much of
@@ -890,32 +899,32 @@ void init_sft(SFTREC_PTR p)
    function uses the knowledge that it is immediately preceded by a
    ffirst(), and that the data is avalable in dirrec_ptr. */
 
-void fill_sft(SFTREC_PTR p, int use_found_1, int truncate)
+void fill_sft(SFTREC_PTR sft, int use_found_1, int truncate)
 {
-  _fmemcpy(p->fcb_name, fcbname_ptr1, 11);
+  _fmemcpy(sft->fcb_name, fcbname_ptr1, 11);
   if (use_found_1) {
-    p->attr = dirrec_ptr1->attr;
-    p->datetime = truncate ? dos_ftime() : dirrec_ptr1->datetime;
+    sft->attr = dirrec_ptr1->attr;
+    sft->datetime = truncate ? dos_ftime() : dirrec_ptr1->datetime;
     if (truncate) {
 #ifdef ENABLE_XMS
       FREE_SECTOR_CHAIN(dirrec_ptr1->start_sector);
 #endif
-      p->fnfile_handle = 0xFFFF;
+      sft->fnfile_handle = 0xFFFF;
     }
 #if 0
     else
-      p->fnfile_handle = dirrec_ptr1->fnfile_handle;
+      sft->fnfile_handle = dirrec_ptr1->fnfile_handle;
 #endif
-    p->size = truncate ? 0L : dirrec_ptr1->size;
-    //p->fnfile_handle = srchrec_ptr1->fndir_handle;
-    p->sequence = (uint8_t) srchrec_ptr1->sequence;
+    sft->size = truncate ? 0L : dirrec_ptr1->size;
+    //sft->fnfile_handle = srchrec_ptr1->fndir_handle;
+    sft->sequence = (uint8_t) srchrec_ptr1->sequence;
   }
   else {
-    p->attr = (uint8_t) *stack_param_ptr;   /* Attr is top of stack */
-    p->datetime = dos_ftime();
-    p->fnfile_handle = 0xffff;
-    p->size = 0;
-    p->sequence = 0xff;
+    sft->attr = (uint8_t) *stack_param_ptr;   /* Attr is top of stack */
+    sft->datetime = dos_ftime();
+    sft->fnfile_handle = 0xffff;
+    sft->size = 0;
+    sft->sequence = 0xff;
   }
 }
 
@@ -923,7 +932,7 @@ void fill_sft(SFTREC_PTR p, int use_found_1, int truncate)
 /* Open Existing File - subfunction 16h */
 void opnfil(void)
 {
-  SFTREC_PTR p;
+  SFTREC_PTR sft;
 
   /* locate any file for any open */
 
@@ -946,7 +955,7 @@ void opnfil(void)
 /* Truncate/Create File - subfunction 17h */
 void creatfil(void)
 {
-  SFTREC_PTR p = (SFTREC_PTR) MK_FP(r.es, r.di);
+  SFTREC_PTR sft = (SFTREC_PTR) MK_FP(r.es, r.di);
 
   if (contains_wildcards(fcbname_ptr1)) {
     fail(DOSERR_PATH_NOT_FOUND);
@@ -963,8 +972,8 @@ void creatfil(void)
     return;
   }
 
-  fill_sft(p, (!r.ax), TRUE);
-  init_sft(p);
+  fill_sft(sft, (!r.ax), TRUE);
+  init_sft(sft);
   succeed();
 }
 
@@ -972,17 +981,17 @@ void creatfil(void)
 void skfmend(void)
 {
   long seek_amnt;
-  SFTREC_PTR p;
+  SFTREC_PTR sft;
 
   /* But, just in case... */
   seek_amnt = -1L * (((long) r.cx << 16) + r.dx);
-  p = (SFTREC_PTR) MK_FP(r.es, r.di);
-  if (seek_amnt > p->size)
-    seek_amnt = p->size;
+  sft = (SFTREC_PTR) MK_FP(r.es, r.di);
+  if (seek_amnt > sft->size)
+    seek_amnt = sft->size;
 
-  p->pos = p->size - seek_amnt;
-  r.dx = (uint16_t) (p->pos >> 16);
-  r.ax = (uint16_t) (p->pos & 0xFFFF);
+  sft->pos = sft->size - seek_amnt;
+  r.dx = (uint16_t) (sft->pos >> 16);
+  r.ax = (uint16_t) (sft->pos & 0xFFFF);
 }
 
 void unknown_fxn_2D()
@@ -1037,7 +1046,14 @@ void open_extended(void)
     return;
   }
 
-  *srch_attr_ptr = 0x3f;
+  if (curr_fxn == 0x16) {
+#ifdef DEBUG
+    consolef("OPEN EXISTING\n");
+#endif
+    *srch_attr_ptr = 0x27;
+  }
+  else
+    *srch_attr_ptr = 0x3f;
   ffirst();
 
   path = undosify_path(filename_ptr1);
@@ -1056,7 +1072,9 @@ void open_extended(void)
 
   fill_sft(sft, (!r.ax), action & REPLACE_IF_EXISTS);
   init_sft(sft);
-  //dumpHex(sft, sizeof(*sft), 0);
+#ifdef DEBUG
+  dumpHex(sft, sizeof(*sft), 0);
+#endif
   succeed();
 }
 
@@ -1238,21 +1256,21 @@ void interrupt far redirector(ALL_REGS entry_regs)
   our_sp = (FP_OFF(our_stack) + 15) >> 4;
   our_ss = FP_SEG(our_stack) + our_sp;
   our_sp = STACK_SIZE - 2 - (((our_sp - (FP_OFF(our_stack) >> 4)) << 4)
-			     - (FP_OFF(our_stack) & 0xf));
+                             - (FP_OFF(our_stack) & 0xf));
 #if 0
 #ifdef DEBUG
   consolef("STACK 0x%08lx SS:SP=%04x:%04x OUR=%04x:%04x FP=%04x:%04x DS=%04x\n",
-	   (void far *) our_stack, cur_ss, cur_sp,
-	   our_ss, our_sp, FP_SEG(our_stack), FP_OFF(our_stack), getDS());
+           (void far *) our_stack, cur_ss, cur_sp,
+           our_ss, our_sp, FP_SEG(our_stack), FP_OFF(our_stack), getDS());
 #endif
 #endif
-    
+
   _asm {
     mov dos_sp, sp;
 
     mov ax, our_ss;
     mov cx, our_sp;
-      
+
     // activate new stack
     cli;
     mov ss, ax;
@@ -1299,7 +1317,7 @@ void interrupt far redirector(ALL_REGS entry_regs)
   consolef("restored SS:SP=%04x:%04x DOS=%04x:%04x\n", cur_ss, cur_sp, dos_ss, dos_sp);
 #endif
 #endif
-  
+
   // put the possibly changed registers back on the stack, and return
   entry_regs = r;
   return;
