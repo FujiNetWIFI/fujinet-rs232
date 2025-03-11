@@ -542,8 +542,6 @@ void md(void)
 /* Change Directory - subfunction 05h */
 void cd(void)
 {
-  fail(DOSERR_PATH_NOT_FOUND);
-  return;
   /* Special case for root */
   if ((*filename_ptr1 != '\\') || (*(filename_ptr1 + 1))) {
     if (contains_wildcards(fcbname_ptr1)) {

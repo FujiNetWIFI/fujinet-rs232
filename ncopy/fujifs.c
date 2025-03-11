@@ -39,6 +39,7 @@ typedef struct {
   uint8_t is_open:1;
   uint8_t did_auth:1;
   size_t position, length;
+  // FIXME - move to host/url handle
   char user[32], password[32];
 } fn_network_handle;
 
