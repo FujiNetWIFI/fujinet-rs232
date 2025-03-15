@@ -222,7 +222,7 @@ errcode fujifs_open(fujifs_handle host_handle, fujifs_handle far *file_handle,
 #endif
 
 #if 0
-  printf("FN STATUS: len %i  con %i  err %i\n",
+  consolef("FN STATUS: len %i  con %i  err %i\n",
          status.length, status.connected, status.errcode);
 #endif
   // FIXME - apparently the error returned when opening in write mode should be ignored?
@@ -317,18 +317,16 @@ errcode fujifs_opendir(fujifs_handle host_handle, fujifs_handle far *dir_handle,
   char *sep;
 
 
-  /* FIXME - FujiNet seems to open in directory mode even if it's a
-             file, so append "/." to make it respect directory mode. */
-
   // Figure out which N: device will be used and add prefix so
   // fujifs_buf doesn't get modified during open
   temp = fujifs_find_handle();
   if (!temp)
     return NETWORK_ERROR_NO_DEVICE_AVAILABLE;
-
   ennify(temp, path);
   FN_HANDLE(temp).is_open = 0;
 
+  /* FIXME - FujiNet seems to open in directory mode even if it's a
+             file, so append "/." to make it respect directory mode. */
   sep = strchr(fujifs_buf, ':');
   if (*(sep + 1)) {
     len = strlen(fujifs_buf);
@@ -510,9 +508,73 @@ errcode fujifs_seek(fujifs_handle handle, off_t position)
     return NETWORK_ERROR_NOT_CONNECTED;
 
   reply = fujiF5_write(NETDEV(handle), CMD_SEEK,
-		       position & 0xffff, (position >> 16) & 0xffff, NULL, 0);
+                       position & 0xffff, (position >> 16) & 0xffff, NULL, 0);
   if (reply != REPLY_COMPLETE)
     return NETWORK_ERROR_SERVICE_NOT_AVAILABLE;
 
-  return NETWORK_SUCCESS;
+  return 0;
+}
+
+errcode fujifs_stat(fujifs_handle host_handle, const char far *path, FN_DIRENT far *entry)
+{
+  fujifs_handle dir_handle;
+  char *sep;
+  const char far *fname;
+  errcode err;
+  FN_DIRENT *ent;
+
+
+  // FIXME - this is an extremely slow way to stat a file, it requires
+  //         reading in the entire directory
+
+  // Figure out which N: device will be used and add prefix so
+  // fujifs_buf doesn't get modified during open
+  dir_handle = fujifs_find_handle();
+  if (!dir_handle)
+    return NETWORK_ERROR_NO_DEVICE_AVAILABLE;
+  ennify(dir_handle, path);
+  FN_HANDLE(dir_handle).is_open = 0;
+
+  sep = strrchr(fujifs_buf, '/');
+  if (!sep)
+    return NETWORK_ERROR_FILE_NOT_FOUND;
+  *sep = 0;
+  fname = path + (sep - fujifs_buf) + 2 - sizeof(NETDEV_PREFIX);
+
+  err = fujifs_opendir(host_handle, &dir_handle, fujifs_buf);
+  if (err)
+    return NETWORK_ERROR_SERVICE_NOT_AVAILABLE;
+
+  err = NETWORK_ERROR_FILE_NOT_FOUND;
+  while ((ent = fujifs_readdir(dir_handle))) {
+    if (!_fstricmp(ent->name, fname)) {
+      *entry = *ent;
+      err = 0;
+      break;
+    }
+  }
+
+  fujifs_closedir(dir_handle);
+  return err;
+}
+
+errcode fujifs_rmdir(fujifs_handle host_handle, const char far *path)
+{
+  return NETWORK_ERROR_SERVICE_NOT_AVAILABLE;
+}
+
+errcode fujifs_mkdir(fujifs_handle host_handle, const char far *path)
+{
+  return NETWORK_ERROR_SERVICE_NOT_AVAILABLE;
+}
+
+errcode fujifs_rename(fujifs_handle host_handle, const char far *oldpath,
+                      const char far *newpath)
+{
+  return NETWORK_ERROR_SERVICE_NOT_AVAILABLE;
+}
+
+errcode fujifs_unlink(fujifs_handle host_handle, const char far *path)
+{
+  return NETWORK_ERROR_SERVICE_NOT_AVAILABLE;
 }
