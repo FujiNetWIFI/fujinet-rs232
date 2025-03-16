@@ -25,9 +25,11 @@ typedef struct {
 } FN_DIRENT;
 
 enum {
-  FUJIFS_READ                     = 4,
-  FUJIFS_DIRECTORY                = 6,
-  FUJIFS_WRITE                    = 8,
+  FUJIFS_READ           = 4,
+  FUJIFS_DIRECTORY      = 6,
+  FUJIFS_WRITE          = 8,
+  FUJIFS_APPEND         = 9,
+  FUJIFS_READWRITE      = 12,
 };
 
 extern errcode fujifs_open_url(fujifs_handle far *host_handle, const char *url,

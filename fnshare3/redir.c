@@ -1207,16 +1207,18 @@ void open_extended(void)
     // Bottom 2 bits specify read/write/rw
     flags = open_mode & 0x03;
     if (flags == MODE_READONLY)
-      flags = O_RDONLY;
+      flags = FUJIFS_READ;
     else if (flags == MODE_WRITEONLY)
-      flags = O_WRONLY;
+      flags = FUJIFS_WRITE;
     else if (flags == MODE_READWRITE)
-      flags = O_RDWR;
+      flags = FUJIFS_READWRITE;
     else {
       fail(DOSERR_INVALID_ACCESS_CODE);
       return;
     }
 
+#if 0
+    // FIXME - will need to use fujifs_stat()
     if ((action & 0xFF) & CREATE_IF_NOT_EXIST) {
       flags |= O_CREAT;
       if ((action & 0xFF) & OPEN_IF_EXISTS)
@@ -1224,6 +1226,7 @@ void open_extended(void)
     }
     if ((action & 0xFF) & REPLACE_IF_EXISTS)
       flags |= O_TRUNC;
+#endif
 
 #ifdef DEBUG
     consolef("FUJIFS_OPEN FLAGS 0x%04x\n", flags);
