@@ -299,12 +299,19 @@ size_t fujifs_write(fujifs_handle handle, uint8_t far *buf, size_t length)
   int reply;
 
 
-  if (handle < 1 || handle >= NETDEV_TOTAL)
-    return 0;
+  if (handle < 1 || handle >= NETDEV_TOTAL) {
+    consolef("FUJIFS_WRITE HANDLE NOT OPEN %i\n", handle);
+    return -1;
+  }
+
+  if (length == -1)
+    length--;
 
   reply = fujiF5_write(NETDEV(handle), CMD_WRITE, length, 0, buf, length);
-  if (reply != REPLY_COMPLETE)
-    return 0;
+  if (reply != REPLY_COMPLETE) {
+    consolef("FUJIFS_WRITE FAILED %i\n", reply);
+    return -1;
+  }
   return length;
 }
 
@@ -602,9 +609,15 @@ errcode fujifs_mkdir(fujifs_handle host_handle, const char far *path)
 #endif
 
   reply = fujiF5_read(NETDEV(host_handle), CMD_STATUS, 0, 0, &status, sizeof(status));
+  // FIXME - for some reason when SMB successfully creates a directory
+  //         it reports END_OF_FILE with a length of zero
+  if (status.errcode == NETWORK_ERROR_END_OF_FILE && !status.length)
+    status.errcode = NETWORK_SUCCESS;
+
 #if 1
-  consolef("FN STATUS: len %i  con %i  err %i\n",
-         status.length, status.connected, status.errcode);
+  if (status.errcode != NETWORK_SUCCESS)
+    consolef("FN STATUS: len %i  con %i  err %i\n",
+	     status.length, status.connected, status.errcode);
 #endif
 
   return status.errcode == NETWORK_SUCCESS ? 0 : status.errcode;

@@ -243,7 +243,7 @@ int fujicom_command_write(cmdFrame_t far *cmd, void far *ptr, uint16_t len)
   port_putc_nobuf(port, ck);
 
   /* Wait for ACK/NACK */
-  reply = port_getc_nobuf(port, TIMEOUT);
+  reply = port_getc_nobuf(port, TIMEOUT_SLOW);
   if (reply != 'A') {
 #ifdef DEBUG
     consolef("FN write ack fail: 0x%04x\n", reply);

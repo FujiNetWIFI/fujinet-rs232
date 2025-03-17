@@ -9,7 +9,7 @@
 #include <ctype.h>
 
 #undef DEBUG
-#undef DEBUG_DISPATCH
+#define DEBUG_DISPATCH
 #ifdef DEBUG
 #include "debug.h"
 #endif
@@ -220,17 +220,20 @@ void find_next(void)
 
 
   if (srchrec_ptr1->dir_handle == -1) {
+    if ((path = _fstrrchr(filename_ptr1, '\\')))
+      *path = 0;
 #ifdef DEBUG
     consolef("OPENING DIRECTORY \"%ls\"\n", filename_ptr1);
 #endif
-    if ((path = _fstrrchr(filename_ptr1, '\\')))
-      *path = 0;
     undos = undosify_path(filename_ptr1);
     undos = path_with_volume(undos);
     err = fujifs_opendir(fn_host, &handle, undos);
     if (path)
       *path = '\\';
     if (err) {
+#ifdef DEBUG
+      consolef("OPENDIR FAILED %i\n", err);
+#endif
       fail(DOSERR_UNEXPECTED_NETWORK_ERROR);
       return;
     }
@@ -516,6 +519,9 @@ void make_dir(void)
     undos = undosify_path(filename_ptr1);
     undos = path_with_volume(undos);
     if (fujifs_mkdir(fn_host, undos)) {
+#ifdef DEBUG
+      consolef("FAILED TO MKDIR \"%s\"\n", undos);
+#endif
       fail(DOSERR_ACCESS_DENIED);
       return;
     }
@@ -648,16 +654,14 @@ void write_file(void)
 
 #ifdef DIRECT_DRIVE
   sft->datetime = dos_ftime();
-#endif
 
   /* Take account of DOS' 0-byte-write-truncates-file rcounte */
   if (!r.cx) {
     sft->size = sft->pos;
-#ifdef DIRECT_DRIVE
     chop_file(sft->pos, &sft->start_sector, &sft->rel_sector, &sft->abs_sector);
-#endif
     return;
   }
+#endif
 
   /* Write from the caller's buffer and update the SFT for the file */
 #ifdef DIRECT_DRIVE
@@ -666,7 +670,17 @@ void write_file(void)
 #else
   if (sft->pos != sft->last_pos)
     fujifs_seek(sft->file_handle, sft->pos); // FIXME - check error
+#ifdef DEBUG
+  consolef("WRITING %i\n", r.cx);
+#endif
   r.cx = fujifs_write(sft->file_handle, ((SDA_PTR_V3) sda_ptr)->current_dta, r.cx);
+#ifdef DEBUG
+  consolef("WROTE %i\n", r.cx);
+#endif
+  if (r.cx == -1) {
+    fail(DOSERR_DRIVE_NOT_READY);
+    return;
+  }
   sft->pos += r.cx;
   sft->last_pos = sft->pos;
 #endif
