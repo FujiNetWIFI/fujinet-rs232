@@ -483,35 +483,6 @@ FN_DIRENT *fujifs_readdir(fujifs_handle handle)
   return &ent;
 }
 
-errcode fujifs_chdir(fujifs_handle host_handle, const char far *path)
-{
-  int reply;
-  int idx;
-
-
-  ennify(host_handle, path);
-  reply = fujiF5_write(NETDEV(host_handle), CMD_CHDIR, 0, 0, fujifs_buf, OPEN_SIZE);
-#if 0
-  if (reply != REPLY_COMPLETE)
-    printf("FUJIFS_CHDIR CHDIR REPLY: 0x%02x\n", reply);
-  // FIXME - check err
-#endif
-
-  reply = fujiF5_read(NETDEV(host_handle), CMD_STATUS, 0, 0, &status, sizeof(status));
-#if 0
-  consolef("FN STATUS: len %i  con %i  err %i\n",
-         status.length, status.connected, status.errcode);
-#endif
-
-  // Invalidate all other network drives that have us as parent
-  for (idx = 0; idx < NETDEV_TOTAL; idx++)
-    if (FN_HANDLE(idx + 1).parent == host_handle)
-      FN_HANDLE(idx + 1).parent = 0;
-  FN_HANDLE(host_handle).parent = host_handle;
-
-  return 0;
-}
-
 errcode fujifs_seek(fujifs_handle handle, off_t position)
 {
   int reply;
@@ -571,14 +542,14 @@ errcode fujifs_stat(fujifs_handle host_handle, const char far *path, FN_DIRENT f
   return err;
 }
 
-errcode fujifs_rmdir(fujifs_handle host_handle, const char far *path)
+errcode fujifs_path_operation(fujifs_handle host_handle, uint8_t command, const char far *path)
 {
   int reply;
   int idx;
 
 
   ennify(host_handle, path);
-  reply = fujiF5_write(NETDEV(host_handle), CMD_RMDIR, 0, 0, fujifs_buf, OPEN_SIZE);
+  reply = fujiF5_write(NETDEV(host_handle), command, 0, 0, fujifs_buf, OPEN_SIZE);
 #if 0
   if (reply != REPLY_COMPLETE)
     printf("FUJIFS_CHDIR CHDIR REPLY: 0x%02x\n", reply);
@@ -586,30 +557,7 @@ errcode fujifs_rmdir(fujifs_handle host_handle, const char far *path)
 #endif
 
   reply = fujiF5_read(NETDEV(host_handle), CMD_STATUS, 0, 0, &status, sizeof(status));
-#if 1
-  consolef("FN STATUS: len %i  con %i  err %i\n",
-         status.length, status.connected, status.errcode);
-#endif
-
-  return status.errcode == NETWORK_SUCCESS ? 0 : status.errcode;
-}
-
-errcode fujifs_mkdir(fujifs_handle host_handle, const char far *path)
-{
-  int reply;
-  int idx;
-
-
-  ennify(host_handle, path);
-  reply = fujiF5_write(NETDEV(host_handle), CMD_MKDIR, 0, 0, fujifs_buf, OPEN_SIZE);
-#if 0
-  if (reply != REPLY_COMPLETE)
-    printf("FUJIFS_CHDIR CHDIR REPLY: 0x%02x\n", reply);
-  // FIXME - check err
-#endif
-
-  reply = fujiF5_read(NETDEV(host_handle), CMD_STATUS, 0, 0, &status, sizeof(status));
-  // FIXME - for some reason when SMB successfully creates a directory
+  // FIXME - for some reason when SMB successfully completes path op
   //         it reports END_OF_FILE with a length of zero
   if (status.errcode == NETWORK_ERROR_END_OF_FILE && !status.length)
     status.errcode = NETWORK_SUCCESS;
@@ -623,31 +571,38 @@ errcode fujifs_mkdir(fujifs_handle host_handle, const char far *path)
   return status.errcode == NETWORK_SUCCESS ? 0 : status.errcode;
 }
 
-errcode fujifs_rename(fujifs_handle host_handle, const char far *oldpath,
-                      const char far *newpath)
+errcode fujifs_chdir(fujifs_handle host_handle, const char far *path)
 {
-  return NETWORK_ERROR_SERVICE_NOT_AVAILABLE;
+  errcode err = fujifs_path_operation(host_handle, CMD_CHDIR, path);
+  int idx;
+
+
+  // Invalidate all other network drives that have us as parent
+  for (idx = 0; idx < NETDEV_TOTAL; idx++)
+    if (FN_HANDLE(idx + 1).parent == host_handle)
+      FN_HANDLE(idx + 1).parent = 0;
+  FN_HANDLE(host_handle).parent = host_handle;
+
+  return err;
+}
+
+errcode fujifs_rmdir(fujifs_handle host_handle, const char far *path)
+{
+  return fujifs_path_operation(host_handle, CMD_RMDIR, path);
+}
+
+errcode fujifs_mkdir(fujifs_handle host_handle, const char far *path)
+{
+  return fujifs_path_operation(host_handle, CMD_MKDIR, path);
 }
 
 errcode fujifs_unlink(fujifs_handle host_handle, const char far *path)
 {
-  int reply;
-  int idx;
+  return fujifs_path_operation(host_handle, CMD_DELETE, path);
+}
 
-
-  ennify(host_handle, path);
-  reply = fujiF5_write(NETDEV(host_handle), CMD_DELETE, 0, 0, fujifs_buf, OPEN_SIZE);
-#if 0
-  if (reply != REPLY_COMPLETE)
-    printf("FUJIFS_CHDIR CHDIR REPLY: 0x%02x\n", reply);
-  // FIXME - check err
-#endif
-
-  reply = fujiF5_read(NETDEV(host_handle), CMD_STATUS, 0, 0, &status, sizeof(status));
-#if 0
-  consolef("FN STATUS: len %i  con %i  err %i\n",
-         status.length, status.connected, status.errcode);
-#endif
-
-  return status.errcode == NETWORK_SUCCESS ? 0 : status.errcode;
+errcode fujifs_rename(fujifs_handle host_handle, const char far *oldpath,
+                      const char far *newpath)
+{
+  return NETWORK_ERROR_SERVICE_NOT_AVAILABLE;
 }
