@@ -92,8 +92,12 @@ enum {
 };
 
 enum {
-  CMD_SEEK			= 0x25,
-  CMD_TELL			= 0x26,
+  CMD_RENAME                    = 0x20,
+  CMD_DELETE                    = 0x21,
+  CMD_SEEK                      = 0x25,
+  CMD_TELL                      = 0x26,
+  CMD_MKDIR                     = 0x2a,
+  CMD_RMDIR                     = 0x2b,
   CMD_CHDIR                     = 0x2c,
   CMD_GETCWD                    = 0x30,
   CMD_OPEN                      = 'O',

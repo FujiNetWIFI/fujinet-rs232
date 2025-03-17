@@ -116,9 +116,6 @@ void fcbitize(char far *dest, const char *source)
     _fmemcpy(&dest[8], ext, len <= 3 ? len : 3);
   }
 
-#ifdef DEBUG
-  consolef("FCBITIZE \"%ls\" \"%ls\"\n", (char far *) source, dest);
-#endif
   return;
 }
 
@@ -477,7 +474,7 @@ void make_dir(void)
 
     undos = undosify_path(filename_ptr1);
     undos = path_with_volume(undos);
-    if (fujifs_stat(fn_host, undos, &entry)) {
+    if (!fujifs_stat(fn_host, undos, &entry)) {
       fail(DOSERR_FILE_EXISTS);
       return;
     }
@@ -986,6 +983,7 @@ void delete_files(void)
 	char *undos;
 
 
+	fcb_to_path(filename_ptr1, dirrec_ptr1->fcb_name);
 	undos = undosify_path(filename_ptr1);
 	undos = path_with_volume(undos);
 	if (fujifs_unlink(fn_host, undos)) {
