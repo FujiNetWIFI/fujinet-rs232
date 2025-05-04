@@ -93,7 +93,7 @@ uint16_t Init_cmd(SYSREQ far *req)
 
     req->init.num_units = FN_MAX_DEV;
 
-    for (idx = 0; idx < FN_MAX_DEV; idx++) {
+    for (idx = 0; idx < req->init.num_units; idx++) {
       /* 5.25" 360k BPB */
       fn_bpb_table[idx].bps = 512;
       fn_bpb_table[idx].spau = 2;
@@ -160,7 +160,7 @@ uint8_t get_set_time(uint8_t set_flag)
 
     intdos(&regs, &regs);
 
-    consolef("MS-DOS Time now set from FujiNet\n$");
+    consolef("MS-DOS Time now set from FujiNet\n");
   }
 
   return 0;

@@ -8,6 +8,15 @@
 
 #undef DEBUG
 
+#define STACK_SWAP
+#ifdef STACK_SWAP
+#define STACK_SIZE 1024
+char our_stack[STACK_SIZE];     /* our internal stack */
+uint16_t dos_ss;                    /* DOS's saved SS at entry */
+uint16_t dos_sp;                    /* DOS's saved SP at entry */
+uint16_t our_ss, our_sp;
+#endif /* STACK_SWAP */
+
 #define disable() _asm { cli }
 #define enable() _asm { sti }
 
@@ -56,22 +65,54 @@ void far Interrupt(void)
 {
   push_regs();
 
+#ifdef STACK_SWAP
+  // Save ss:sp and switch to our internal stack.
+
+  our_sp = (FP_OFF(our_stack) + 15) >> 4;
+  our_ss = FP_SEG(our_stack) + our_sp;
+  our_sp = STACK_SIZE - 2 - (((our_sp - (FP_OFF(our_stack) >> 4)) << 4)
+                             - (FP_OFF(our_stack) & 0xf));
+
+  _asm {
+    mov dos_ss, ss;
+    mov dos_sp, sp;
+
+    mov ax, our_ss;
+    mov cx, our_sp;
+
+    // activate new stack
+    //cli;
+    mov ss, ax;
+    mov sp, cx;
+    //sti;
+  }
+#endif /* STACK_SWAP */
+
   if (fpRequest->command > MAXCOMMAND
       || !(currentFunction = dispatchTable[fpRequest->command])) {
-    fpRequest->status = DONE_BIT | ERROR_BIT | UNKNOWN_CMD;
+    fpRequest->status = ERROR_BIT | UNKNOWN_CMD;
   }
   else {
 #ifdef DEBUG
-    printDTerm("Command 0x$");
-    printHex(fpRequest->command, 2, '0');
+    consolef("Command 0x%02x", fpRequest->command);
 #endif
     fpRequest->status = currentFunction(fpRequest);
 #ifdef DEBUG
-    printDTerm(" result: 0x$");
-    printHex(fpRequest->status, 4, '0');
-    printDTerm("\r\n$");
+    consolef(" result: 0x%04x\n", fpRequest->status);
 #endif
   }
+
+  fpRequest->status |= DONE_BIT;
+
+#ifdef STACK_SWAP
+  // Switch the stack back
+  _asm {
+    //cli;
+    mov ss, dos_ss;
+    mov sp, dos_sp;
+    //sti;
+  }
+#endif /* STACK_SWAP */
 
   pop_regs();
   return;

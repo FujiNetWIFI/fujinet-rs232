@@ -20,7 +20,7 @@
 #define TIMEOUT_SLOW	15 * 1000
 #define MAX_RETRIES	5
 #ifndef SERIAL_BPS
-#define SERIAL_BPS      9600
+#define SERIAL_BPS      115200
 #endif /* SERIAL_BPS */
 
 PORT fn_port;
