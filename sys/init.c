@@ -129,6 +129,7 @@ uint8_t get_set_time(uint8_t set_flag)
   uint16_t year_wcen;
 
 
+  consolef("Getting FujiNet time\n");
   cmd.device = DEVICEID_APETIME;
   cmd.comnd = CMD_APETIME_GETTZTIME;
 
@@ -199,6 +200,7 @@ void check_uart()
 }
 
 /* Parse CONFIG.SYS command line, returns number of bytes remaining in config_env */
+#define IS_CONFIG_EOL(c) (!c || c == '\r' || c == '\n')
 uint16_t parse_config(const uint8_t far *config_sys)
 {
   int idx, count;
@@ -208,12 +210,16 @@ uint16_t parse_config(const uint8_t far *config_sys)
   uint8_t eq_flag;
 
 
+  consolef("CONFIG.SYS: ");
+  for (cfg = config_sys; cfg && !IS_CONFIG_EOL(*cfg); cfg++)
+    printChar(*cfg);
+  consolef("\n");
   *cfg_env = NULL;
   buf = (char *) &cfg_env[1];
   buf_max = (char *) cfg_env + ((uint16_t) &driver_end - (uint16_t) &config_env);
 
   // Driver filename is everything before the first space
-  for (cfg = config_sys; cfg && *cfg && *cfg != ' ' && *cfg != '\r' && *cfg != '\n'; cfg++)
+  for (cfg = config_sys; cfg && *cfg != ' ' && !IS_CONFIG_EOL(*cfg); cfg++)
     ;
 
   if (*cfg != ' ')
@@ -231,7 +237,7 @@ uint16_t parse_config(const uint8_t far *config_sys)
   count = 0;
   while (1) {
     // Find end of this config option
-    for (; cfg && *cfg && *cfg != ' ' && *cfg != '\r' && *cfg != '\n'; cfg++)
+    for (; cfg && *cfg != ' ' && !IS_CONFIG_EOL(*cfg); cfg++)
       ;
     count++;
     if (*cfg != ' ')
@@ -250,7 +256,7 @@ uint16_t parse_config(const uint8_t far *config_sys)
     cfg_env[idx] = buf;
 
     // Find end of this config option
-    for (eq_flag = 0; cfg && *cfg && *cfg != ' ' && *cfg != '\r' && *cfg != '\n'; cfg++) {
+    for (eq_flag = 0; cfg && *cfg != ' ' && !IS_CONFIG_EOL(*cfg); cfg++) {
       if (*cfg == '=')
 	eq_flag = 1;
       *buf = *cfg;
