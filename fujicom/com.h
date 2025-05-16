@@ -76,12 +76,16 @@ extern int port_identify_uart(PORT far *port);
 
 /*
  * These are the standard UART addresses and interrupt
- * numbers for the two IBM compatible COM ports.
+ * numbers for the four IBM compatible COM ports.
  */
 #define COM1_UART         0x3f8
 #define COM1_INTERRUPT    12
 #define COM2_UART         0x2f8
 #define COM2_INTERRUPT    11
+#define COM3_UART         0x3e8
+#define COM3_INTERRUPT    12
+#define COM4_UART         0x2e8
+#define COM4_INTERRUPT    11
 
 enum {
   UART_8250 = 0,

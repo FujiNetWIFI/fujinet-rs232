@@ -5,6 +5,8 @@
 #ifndef _FUJICOM_H
 #define _FUJICOM_H
 
+#undef FUJIF5_AS_FUNCTION
+
 #include <stdint.h>
 
 #define FUJINET_INT     0xF5
@@ -46,6 +48,12 @@ typedef union {         /* Command Frame */
 } cmdFrame_t;
 
 typedef struct {
+  uint16_t bw;
+  uint8_t connected; /* meaning of this field is inconsistent */
+  uint8_t error;
+} fujiStatus;
+
+typedef struct {
   unsigned char hostSlot;
   unsigned char mode;
   char file[36];
@@ -76,10 +84,13 @@ enum {
   CMD_READ                      = 'R',
   CMD_WRITE                     = 'W',
   CMD_STATUS                    = 'S',
+  CMD_PARSE                     = 'P',
+  CMD_QUERY                     = 'Q',
   CMD_APETIME_GETTIME           = 0x93,
   CMD_APETIME_SETTZ             = 0x99,
   CMD_APETIME_GETTZTIME         = 0x9A,
   CMD_READ_DEVICE_SLOTS         = 0xF2,
+  CMD_JSON                      = 0xFC,
   CMD_USERNAME                  = 0xFD,
   CMD_PASSWORD                  = 0xFE,
 };
@@ -169,8 +180,20 @@ extern int fujicom_command_write(cmdFrame_t far *c, void far *ptr, uint16_t len)
  */
 void fujicom_done(void);
 
+#ifndef FUJIF5_AS_FUNCTION
+extern int fujiF5w(uint16_t direction, uint16_t devcom,
+                  uint16_t aux12, uint16_t aux34, void far *buffer, uint16_t length);
+#pragma aux fujiF5w = \
+  "int 0xf5" \
+  parm [dx] [ax] [cx] [si] [es bx] [di] \
+  modify [ax]
+#define fujiF5(dx, dev, cmd, a12, a34, buf, len) \
+  fujiF5w(dx, cmd << 8 | dev, a12, a34, buf, len)
+#else
 extern int fujiF5(uint8_t direction, uint8_t device, uint8_t command,
                   uint16_t aux12, uint16_t aux34, void far *buffer, uint16_t length);
+#endif
+
 #define fujiF5_none(d, c, a12, a34, b, l) fujiF5(FUJIINT_NONE, d, c, a12, a34, b, l)
 #define fujiF5_read(d, c, a12, a34, b, l) fujiF5(FUJIINT_READ, d, c, a12, a34, b, l)
 #define fujiF5_write(d, c, a12, a34, b, l) fujiF5(FUJIINT_WRITE, d, c, a12, a34, b, l)

@@ -1,16 +1,18 @@
 /**
- * Plot satellite at lat,lon 
+ * Plot satellite at lat,lon
  */
 
+#include <stdlib.h>
 #include "latlon.h"
+#include "grlib.h"
 
 #define CENTER_X 4
 #define CENTER_Y 4
 
-/** 
+/**
  * Satellite bitmap
  */
-char satellite[8] = 
+char satellite[8] =
 {
 	0x20,
 	0x50,
@@ -30,7 +32,7 @@ void sat(char *lat_s, char *lon_s)
 	int   y = latitude[lat+90]-CENTER_Y;
 	int   i = 0;
 	int   j = 0;
-	char b;
+	signed char b;
 
 	for (i=0;i<8;i++)
 	{
@@ -43,5 +45,5 @@ void sat(char *lat_s, char *lon_s)
 				gr_pset(x+j,y+i,0);
 			b <<= 1;
 		}
-	}	
+	}
 }

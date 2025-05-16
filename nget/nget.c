@@ -155,8 +155,28 @@ int main(int argc, char *argv[])
 {
 	if (argc<3)
 	{
-		usage();
-		return 1;
+		char src[256];
+		char dst[24];
+
+		memset(src,0,sizeof(src));
+		memset(dst,0,sizeof(dst));
+
+		if (!argv[1])
+		{
+			printf("SOURCE URL:\n");
+			gets(src);
+
+			if (!src[0])
+				return 1;
+
+			printf("DEST FILE:\n");
+			gets(dst);
+
+			if (!src[1])
+				return 1;
+
+			return nget(src,dst);
+		}
 	}
 
 	return nget(argv[1],argv[2]);

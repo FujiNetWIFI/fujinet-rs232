@@ -9,5 +9,5 @@
 
 void map()
 {
-	memcpy((void *)MK_FP(0xB800,0),map_data,sizeof(map_data));	
+	_fmemcpy((void far *)MK_FP(0xB800,0),map_data,sizeof(map_data));
 }

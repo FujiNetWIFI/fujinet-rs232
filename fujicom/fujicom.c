@@ -20,7 +20,7 @@
 #define TIMEOUT_SLOW	15 * 1000
 #define MAX_RETRIES	5
 #ifndef SERIAL_BPS
-#define SERIAL_BPS      9600
+#define SERIAL_BPS      115200
 #endif /* SERIAL_BPS */
 
 PORT fn_port;
@@ -53,6 +53,14 @@ void fujicom_init(void)
   case 2:
     base = COM2_UART;
     irq = COM2_INTERRUPT;
+    break;
+  case 3:
+    base = COM3_UART;
+    irq = COM3_INTERRUPT;
+    break;
+  case 4:
+    base = COM4_UART;
+    irq = COM4_INTERRUPT;
     break;
   }
 
@@ -273,6 +281,7 @@ void fujicom_done(void)
   return;
 }
 
+#ifdef FUJIF5_AS_FUNCTION
 int fujiF5(uint8_t direction, uint8_t device, uint8_t command,
 	   uint16_t aux12, uint16_t aux34, void far *buffer, uint16_t length)
 {
@@ -287,7 +296,6 @@ int fujiF5(uint8_t direction, uint8_t device, uint8_t command,
   f5regs.x.di = length;
 
   int86x(FUJINET_INT, &f5regs, &f5regs, &f5status);
-
   return f5regs.x.ax;
 }
-
+#endif

@@ -6,8 +6,9 @@
 #define GRLIB_H
 
 int gr_mode(int mode);
-int gr_pset(int x, int y, char c);
-int gr_text(int x, int y, char *s);
-int gr_color(char p, char c);
+void gr_pset(int x, int y, char c);
+void gr_text(int x, int y, char *s);
+void gr_color(char p, char c);
+void gr_palette(unsigned char i, unsigned char c);
 
 #endif /* GRLIB_H */
