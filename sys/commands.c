@@ -28,7 +28,12 @@ uint16_t Media_check_cmd(SYSREQ far *req)
   int reply;
   int64_t old_status, new_status;
 
+  int i=0;
 
+  // Avoid race condition that only happens on PCjr systems
+  // I do not know why this works. -Thom
+  for (i=0;i<8192;i++);
+  
   if (req->unit >= FN_MAX_DEV) {
     consolef("Invalid Media Check unit: %i\n", req->unit);
     return ERROR_BIT | UNKNOWN_UNIT;
