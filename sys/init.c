@@ -53,6 +53,7 @@ extern void setf5(void);
 
 #pragma data_seg("_CODE")
 
+uint8_t get_fujinet_version();
 uint8_t get_set_time(uint8_t set_flag);
 void check_uart();
 uint16_t parse_config(const uint8_t far *config_sys);
@@ -78,9 +79,11 @@ uint16_t Init_cmd(SYSREQ far *req)
   fujicom_init();
   check_uart();
 
-  err = get_set_time(!getenv("NOTIME"));
+  err = get_fujinet_version();
+  if (!err)
+    err = get_set_time(!getenv("NOTIME"));
 
-  // If get_set_time returned error, FujiNet is probably not connected
+  // If get_ returned error, FujiNet is probably not connected
   if (err) {
     fujicom_done();
     return ERROR_BIT;
@@ -119,6 +122,31 @@ uint16_t Init_cmd(SYSREQ far *req)
   consolef("INT F5 Functions installed.\n");
   
   return OP_COMPLETE;
+}
+
+/* Returns non-zero on error */
+uint8_t get_fujinet_version()
+{
+  char reply = 0;
+  AdapterConfig config;
+  unsigned int idx;
+
+
+  cmd.device = DEVICEID_FUJINET;
+  cmd.comnd = CMD_GET_ADAPTERCONFIG;
+  reply = fujicom_command_read(&cmd, (uint8_t *) &config, sizeof(config));
+
+  if (reply != 'C') {
+    consolef("Unable to get FujiNet version %i.\nAborted.\n", reply);
+    return 1;
+  }
+
+  consolef("FujiNet firmware version ");
+  for (idx = 0; idx < sizeof(config.fn_version) && config.fn_version[idx]; idx++)
+    printChar(config.fn_version[idx]);
+  consolef("\n");
+
+  return 0;
 }
 
 /* Returns non-zero on error */

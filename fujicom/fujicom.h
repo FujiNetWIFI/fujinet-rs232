@@ -59,6 +59,20 @@ typedef struct {
   char file[36];
 } deviceSlot_t;
 
+// FIXME - get this from lib/device/sio/fuji.h
+#define MAX_SSID_LEN 32
+typedef struct {
+  char ssid[MAX_SSID_LEN+1];
+  char hostname[64];
+  unsigned char localIP[4];
+  unsigned char gateway[4];
+  unsigned char netmask[4];
+  unsigned char dnsIP[4];
+  unsigned char macAddress[6];
+  unsigned char bssid[6];
+  char fn_version[15];
+} AdapterConfig;
+
 #pragma pack(pop)
 
 enum {
@@ -89,6 +103,7 @@ enum {
   CMD_APETIME_GETTIME           = 0x93,
   CMD_APETIME_SETTZ             = 0x99,
   CMD_APETIME_GETTZTIME         = 0x9A,
+  CMD_GET_ADAPTERCONFIG         = 0xE8,
   CMD_READ_DEVICE_SLOTS         = 0xF2,
   CMD_JSON                      = 0xFC,
   CMD_USERNAME                  = 0xFD,
