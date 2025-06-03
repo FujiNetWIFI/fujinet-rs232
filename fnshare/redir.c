@@ -195,7 +195,7 @@ void fndirent_to_dirrec(FN_DIRENT far *ent, DIRREC_PTR dirrec)
   dirrec->second = ent->mtime.tm_sec / 2;
   dirrec->size = ent->size;
   dirrec->start_sector = 0;
-  
+
   return;
 }
 
@@ -953,7 +953,7 @@ void rename_files(void)
 
 	undos = undosify_path(filename_ptr2);
 	undos = path_with_volume(undos);
-	
+
 	if (fujifs_rename(fn_host, filename_ptr1, undos)) {
 	  fail(DOSERR_ACCESS_DENIED);
 	  return;

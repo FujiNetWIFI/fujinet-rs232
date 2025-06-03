@@ -29,7 +29,7 @@ token get_token(const char *cmd)
 {
   int idx;
 
-  
+
   for (idx = 0; idx < NUM_COMMANDS; idx++)
     if (strcasecmp(cmd, commands[idx].cmd) == 0)
       return commands[idx].token;
@@ -47,12 +47,12 @@ parsed parse_command(char *input)
   result.cmd = CMD_UNKNOWN;
   result.args[0] = input;
   result.args[1] = NULL;
-  
+
   if (!token)
     return result;
-  
+
   result.cmd = get_token(token);
-  
+
   idx = 1;
   while ((token = strtok(NULL, DELIM)) != NULL && idx < MAX_ARGS - 1)
     result.args[idx++] = token;

@@ -35,7 +35,7 @@ void main(int argc, char *argv[])
     printf("Usage: %s URL\n", argv[0]);
     exit(1);
   }
-  
+
   err = fujifs_open_url(&host, url, NULL, NULL);
   if (err) {
     // Maybe authentication is needed?
@@ -91,7 +91,7 @@ void main(int argc, char *argv[])
       break;
     }
   }
-  
+
   exit(0);
 }
 
@@ -161,7 +161,7 @@ void get_file(fujifs_handle host, const char *source, const char *dest)
     total += len;
     lenw = fwrite(buf, 1, len, file);
     printf("%10lu bytes transferred.\r", total);
-    
+
     if (lenw != len) {
       printf("Failed to write\n");
       break;
@@ -203,7 +203,7 @@ void put_file(fujifs_handle host, const char *source, const char *dest)
     lenw = fujifs_write(handle, buf, len);
     total += lenw;
     printf("%10lu bytes transferred.\r", total);
-    
+
     if (lenw != len) {
       printf("Failed to write\n");
       break;
@@ -244,7 +244,7 @@ void put_file(const char *source, const char *dest)
     lenw = fuji_write(buf, len);
     total += lenw;
     printf("%10lu bytes transferred.\r", total);
-    
+
     if (lenw != len) {
       printf("Failed to write\n");
       break;

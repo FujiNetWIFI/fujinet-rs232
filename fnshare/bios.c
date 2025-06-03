@@ -54,4 +54,3 @@ char *my_hex(uint32_t num, int len)
   }
   return buf;
 }
-
