@@ -1,4 +1,4 @@
-TARGET  = fnshare3.exe
+TARGET  = fnshare.exe
 AS      = wasm -q
 ASFLAGS = -0 -mt -bt=DOS
 CC      = wcc -q
