@@ -92,7 +92,14 @@ enum {
 };
 
 enum {
+  CMD_RENAME                    = 0x20,
+  CMD_DELETE                    = 0x21,
+  CMD_SEEK                      = 0x25,
+  CMD_TELL                      = 0x26,
+  CMD_MKDIR                     = 0x2a,
+  CMD_RMDIR                     = 0x2b,
   CMD_CHDIR                     = 0x2c,
+  CMD_GETCWD                    = 0x30,
   CMD_OPEN                      = 'O',
   CMD_CLOSE                     = 'C',
   CMD_READ                      = 'R',
@@ -145,6 +152,8 @@ enum {
   NETWORK_ERROR_COULD_NOT_PARSE_JSON            = 213,
   NETWORK_ERROR_CLIENT_GENERAL                  = 214,
   NETWORK_ERROR_SERVER_GENERAL                  = 215,
+  NETWORK_ERROR_NO_DEVICE_AVAILABLE             = 216,
+  NETWORK_ERROR_NOT_A_DIRECTORY                 = 217,
   NETWORK_ERROR_COULD_NOT_ALLOCATE_BUFFERS      = 255,
 };
 

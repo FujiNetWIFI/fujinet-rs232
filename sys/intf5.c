@@ -31,7 +31,7 @@ int intf5(uint16_t direction, uint16_t devcom, uint16_t aux12, uint16_t aux34,
     _cmdFrame.aux12 = aux12;
     _cmdFrame.aux34 = aux34;
 
-    switch (direction)
+    switch (direction & 0xFF)
     {
     case FUJIINT_NONE: // No Payload
         reply = fujicom_command(&_cmdFrame);

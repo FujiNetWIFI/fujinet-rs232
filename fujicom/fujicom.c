@@ -119,10 +119,8 @@ int fujicom_command(cmdFrame_t far *cmd)
   _fujicom_send_command(cmd);
   reply = port_getc_nobuf(port, TIMEOUT);
   //port_enable_interrupts(port);
-#if 0
 #ifdef DEBUG
   consolef("FN command reply: 0x%04x\n", reply);
-#endif
 #endif
 
   return reply;
@@ -197,10 +195,8 @@ int fujicom_command_read(cmdFrame_t far *cmd, void far *ptr, uint16_t len)
 
  done:
   //port_enable_interrupts(port);
-#if 0
 #ifdef DEBUG
   consolef("FN command read reply: 0x%04x\n", reply);
-#endif
 #endif
   return reply;
 }
@@ -247,7 +243,7 @@ int fujicom_command_write(cmdFrame_t far *cmd, void far *ptr, uint16_t len)
   port_putc_nobuf(port, ck);
 
   /* Wait for ACK/NACK */
-  reply = port_getc_nobuf(port, TIMEOUT);
+  reply = port_getc_nobuf(port, TIMEOUT_SLOW);
   if (reply != 'A') {
 #ifdef DEBUG
     consolef("FN write ack fail: 0x%04x\n", reply);
@@ -258,19 +254,15 @@ int fujicom_command_write(cmdFrame_t far *cmd, void far *ptr, uint16_t len)
   /* Wait for COMPLETE/ERROR */
   reply = port_getc_nobuf(port, TIMEOUT_SLOW);
   if (reply != 'C') {
-#if 0
 #ifdef DEBUG
     consolef("FN write complete fail: 0x%04x\n", reply);
-#endif
 #endif
   }
 
  done:
   //port_enable_interrupts(port)
-#if 0
 #ifdef DEBUG
   consolef("FN command write reply: 0x%04x\n", reply);
-#endif
 #endif
   return reply;
 }
@@ -285,6 +277,7 @@ void fujicom_done(void)
 int fujiF5(uint8_t direction, uint8_t device, uint8_t command,
 	   uint16_t aux12, uint16_t aux34, void far *buffer, uint16_t length)
 {
+  int result;
   f5regs.x.dx = direction;
   f5regs.h.al = device;
   f5regs.h.ah = command;

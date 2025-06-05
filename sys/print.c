@@ -5,7 +5,7 @@
 void printHex(uint16_t val, uint16_t width, char leading)
 {
   uint16_t digits, tval;
-  const char hex_digits[] = "0123456789ABCDEF";
+  char c;
 
 
   for (tval = val, digits = 0; tval; tval >>= 4, digits++)
@@ -18,7 +18,8 @@ void printHex(uint16_t val, uint16_t width, char leading)
 
   while (digits) {
     digits--;
-    printChar(hex_digits[(val >> 4 * digits) & 0xf]);
+    c = (val >> 4 * digits) & 0xf;
+    printChar('0' + c + (c > 9 ? 7 : 0));
   }
 
   return;
@@ -28,7 +29,7 @@ void printHex32(uint32_t val, uint16_t width, char leading)
 {
   uint16_t digits;
   uint32_t tval;
-  const char hex_digits[] = "0123456789ABCDEF";
+  char c;
 
 
   for (tval = val, digits = 0; tval; tval >>= 4, digits++)
@@ -41,7 +42,8 @@ void printHex32(uint32_t val, uint16_t width, char leading)
 
   while (digits) {
     digits--;
-    printChar(hex_digits[(val >> 4 * digits) & 0xf]);
+    c = (val >> 4 * digits) & 0xf;
+    printChar('0' + c + (c > 9 ? 7 : 0));
   }
 
   return;
@@ -93,6 +95,20 @@ void printDec32(uint32_t val, uint16_t width, char leading)
     tens /= 10;
   }
 
+  return;
+}
+
+void printString(const char *str)
+{
+  for (; str && *str; str++)
+    printChar(*str);
+  return;
+}
+
+void printFarString(const char far *str)
+{
+  for (; str && *str; str++)
+    printChar(*str);
   return;
 }
 
@@ -200,14 +216,18 @@ void consolef(const char *format, ...)
 	  pf++;
 	  if (*pf == 'x')
 	    printHex32(va_arg(args, uint32_t), width, leader);
-	  if (*pf == 'i' || *pf == 'd')
+	  else if (*pf == 'i' || *pf == 'd')
 	    printDec32(va_arg(args, uint32_t), width, leader);
+	  else if (*pf == 's')
+	    printFarString(va_arg(args, char far *));
 	}
 	else {
 	  if (*pf == 'x')
 	    printHex(va_arg(args, uint16_t), width, leader);
-	  if (*pf == 'i' || *pf == 'd')
+	  else if (*pf == 'i' || *pf == 'd')
 	    printDec(va_arg(args, uint16_t), width, leader);
+	  else if (*pf == 's')
+	    printString(va_arg(args, char *));
 	}
       }
       break;
